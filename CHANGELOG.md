@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0] - 2026-03-03
+
+### Added
+
+- Backblaze B2 provider support (S3-compatible endpoint defaults + region suggestions)
+- Wasabi provider support (S3-compatible endpoint defaults + region suggestions)
+- MinIO provider support (S3-compatible endpoint defaults + region suggestions)
+- DigitalOcean Spaces support (S3-compatible endpoint defaults + region suggestions)
+
+### Changed
+
+- Connection provider type picker now uses a dropdown with provider icons
+- Sidebar provider rows now prioritize connection names with hover-revealed action buttons
+
 ## [1.2.0] - 2026-03-03
 
 ### Added
@@ -99,3 +113,4 @@ First public release of CloudEx.
 [1.0.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.0.0
 [1.1.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.1.0
 [1.2.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.2.0
+[1.3.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.3.0

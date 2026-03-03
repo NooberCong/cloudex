@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { CheckCircle, XCircle } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { CheckCircle, XCircle, ChevronDown, Cloud, HardDrive } from 'lucide-react'
 import { Dialog } from '../UI/Dialog'
 import { Button } from '../UI/Button'
 import type { ProviderConfig, ProviderType } from '../../types'
@@ -64,6 +64,71 @@ const S3_STANDARD_REGIONS = [
   'ap-northeast-3'
 ]
 
+const B2_STANDARD_REGIONS = [
+  'us-west-004',
+  'us-west-002',
+  'us-east-005',
+  'eu-central-003',
+  'ap-southeast-001'
+]
+
+const WASABI_STANDARD_REGIONS = [
+  'us-east-1',
+  'us-east-2',
+  'us-central-1',
+  'us-west-1',
+  'ca-central-1',
+  'eu-central-1',
+  'eu-central-2',
+  'eu-west-1',
+  'eu-west-2',
+  'ap-northeast-1',
+  'ap-southeast-1'
+]
+
+const SPACES_STANDARD_REGIONS = [
+  'nyc3',
+  'ams3',
+  'sgp1',
+  'fra1',
+  'tor1',
+  'blr1',
+  'sfo2',
+  'sfo3'
+]
+
+const isR2Type = (type: ProviderType) => type === 'cloudflare-r2'
+const isB2Type = (type: ProviderType) => type === 'backblaze-b2'
+const isWasabiType = (type: ProviderType) => type === 'wasabi-s3'
+const isMinIOType = (type: ProviderType) => type === 'minio-s3'
+const isSpacesType = (type: ProviderType) => type === 'digitalocean-spaces'
+
+const defaultRegionForType = (type: ProviderType) => {
+  if (isR2Type(type)) return 'auto'
+  if (isB2Type(type)) return 'us-west-004'
+  if (isWasabiType(type)) return 'us-east-1'
+  if (isMinIOType(type)) return 'us-east-1'
+  if (isSpacesType(type)) return 'nyc3'
+  return 'us-east-1'
+}
+
+const providerTypeLabel = (type: ProviderType) => {
+  if (type === 'aws-s3') return 'AWS S3'
+  if (type === 'cloudflare-r2') return 'Cloudflare R2'
+  if (type === 'wasabi-s3') return 'Wasabi'
+  if (type === 'minio-s3') return 'MinIO'
+  if (type === 'digitalocean-spaces') return 'DigitalOcean Spaces'
+  return 'Backblaze B2'
+}
+
+const providerTypeIcon = (type: ProviderType) => {
+  if (type === 'aws-s3') return <Cloud className="w-3.5 h-3.5 text-[#FF9900]" />
+  if (type === 'cloudflare-r2') return <HardDrive className="w-3.5 h-3.5 text-[#F48120]" />
+  if (type === 'wasabi-s3') return <HardDrive className="w-3.5 h-3.5 text-[#74B72E]" />
+  if (type === 'minio-s3') return <HardDrive className="w-3.5 h-3.5 text-[#C72E49]" />
+  if (type === 'digitalocean-spaces') return <HardDrive className="w-3.5 h-3.5 text-[#0080FF]" />
+  return <HardDrive className="w-3.5 h-3.5 text-[#E85C33]" />
+}
 
 export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   const { saveProvider, testProvider } = useProvidersStore()
@@ -73,25 +138,26 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null)
   const [regionMenuOpen, setRegionMenuOpen] = useState(false)
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setTestResult(null)
-      setRegionMenuOpen(false)
-      if (editing) {
-        setForm({
-          name: editing.name,
-          type: editing.type,
-          accessKeyId: editing.accessKeyId,
-          secretAccessKey: editing.secretAccessKey,
-          region: editing.region,
-          endpoint: editing.endpoint || '',
-          accountId: editing.accountId || '',
-          defaultBucket: editing.defaultBucket || editing.allowedBuckets?.[0] || ''
-        })
-      } else {
-        setForm({ ...EMPTY })
-      }
+    if (!open) return
+    setTestResult(null)
+    setRegionMenuOpen(false)
+    setTypeMenuOpen(false)
+    if (editing) {
+      setForm({
+        name: editing.name,
+        type: editing.type,
+        accessKeyId: editing.accessKeyId,
+        secretAccessKey: editing.secretAccessKey,
+        region: editing.region,
+        endpoint: editing.endpoint || '',
+        accountId: editing.accountId || '',
+        defaultBucket: editing.defaultBucket || editing.allowedBuckets?.[0] || ''
+      })
+    } else {
+      setForm({ ...EMPTY })
     }
   }, [open, editing])
 
@@ -104,22 +170,11 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
     setForm((f) => ({
       ...f,
       type,
-      region: type === 'cloudflare-r2' ? 'auto' : 'us-east-1',
-      endpoint: ''
+      region: defaultRegionForType(type),
+      endpoint: '',
+      accountId: type === 'cloudflare-r2' ? f.accountId : ''
     }))
     setTestResult(null)
-  }
-
-  const handleTest = async () => {
-    setTesting(true)
-    setTestResult(null)
-    try {
-      const config = buildConfig()
-      const result = await testProvider(config)
-      setTestResult(result)
-    } finally {
-      setTesting(false)
-    }
   }
 
   const buildConfig = (): ProviderConfig => ({
@@ -128,13 +183,24 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
     type: form.type,
     accessKeyId: form.accessKeyId.trim(),
     secretAccessKey: form.secretAccessKey,
-    region: form.region.trim() || (form.type === 'cloudflare-r2' ? 'auto' : 'us-east-1'),
+    region: form.region.trim() || defaultRegionForType(form.type),
     endpoint: form.endpoint.trim() || undefined,
     accountId: form.accountId.trim() || undefined,
     defaultBucket: form.defaultBucket.trim() || undefined,
     createdAt: editing?.createdAt || 0,
     updatedAt: 0
   })
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await testProvider(buildConfig())
+      setTestResult(result)
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!form.name.trim()) return toast.error('Provider name is required')
@@ -156,8 +222,17 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
     }
   }
 
-  const isR2 = form.type === 'cloudflare-r2'
-  const filteredRegions = S3_STANDARD_REGIONS.filter((region) =>
+  const isR2 = isR2Type(form.type)
+  const isB2 = isB2Type(form.type)
+  const isWasabi = isWasabiType(form.type)
+  const isMinIO = isMinIOType(form.type)
+  const isSpaces = isSpacesType(form.type)
+  const suggestedRegions = isB2
+    ? B2_STANDARD_REGIONS
+    : (isWasabi
+      ? WASABI_STANDARD_REGIONS
+      : (isSpaces ? SPACES_STANDARD_REGIONS : S3_STANDARD_REGIONS))
+  const filteredRegions = suggestedRegions.filter((region) =>
     region.toLowerCase().includes(form.region.trim().toLowerCase())
   )
 
@@ -166,45 +241,73 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
       open={open}
       onOpenChange={onOpenChange}
       title={editing ? 'Edit Provider' : 'Add Storage Provider'}
-      description="Connect to AWS S3 or Cloudflare R2"
+      description="Connect to AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, or DigitalOcean Spaces"
     >
       <div className="space-y-4">
-        {/* Provider type selector */}
         <div>
           <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
             Provider Type
           </label>
-          <div className="flex gap-2">
-            {(['aws-s3', 'cloudflare-r2'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => handleTypeChange(type)}
-                className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
-                  form.type === type
-                    ? 'bg-[var(--accent-light)] border-[var(--accent)] text-[var(--accent)]'
-                    : 'bg-[var(--bg-tertiary)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]'
-                }`}
-              >
-                {type === 'aws-s3' ? '☁️ AWS S3' : '🔶 Cloudflare R2'}
-              </button>
-            ))}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTypeMenuOpen((v) => !v)}
+              onBlur={() => setTimeout(() => setTypeMenuOpen(false), 120)}
+              className="w-full flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                {providerTypeIcon(form.type)}
+                {providerTypeLabel(form.type)}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+            </button>
+
+            {typeMenuOpen && (
+              <div className="absolute z-20 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg overflow-hidden p-1">
+                {(['aws-s3', 'cloudflare-r2', 'backblaze-b2', 'wasabi-s3', 'minio-s3', 'digitalocean-spaces'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      handleTypeChange(type)
+                      setTypeMenuOpen(false)
+                    }}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+                      form.type === type
+                        ? 'bg-[var(--bg-selected)] text-[var(--accent)]'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {providerTypeIcon(type)}
+                    {providerTypeLabel(type)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Name */}
         <Field label="Display Name" required>
           <input
-            placeholder={isR2 ? 'My R2 Storage' : 'My S3 Bucket'}
+            placeholder={
+              isR2
+                ? 'My R2 Storage'
+                : (isB2
+                  ? 'My B2 Storage'
+                  : (isWasabi
+                    ? 'My Wasabi Storage'
+                    : (isMinIO ? 'My MinIO Storage' : (isSpaces ? 'My Spaces Storage' : 'My S3 Bucket'))))
+            }
             value={form.name}
             onChange={(e) => update('name', e.target.value)}
             style={{ userSelect: 'auto' }}
           />
         </Field>
 
-        {/* Access Key */}
         <Field label="Access Key ID" required>
           <input
-            placeholder={isR2 ? 'R2 API Token ID' : 'AKIAIOSFODNN7EXAMPLE'}
+            placeholder={isR2 ? 'R2 API Token ID' : (isB2 ? 'B2 keyID' : 'AKIAIOSFODNN7EXAMPLE')}
             value={form.accessKeyId}
             onChange={(e) => update('accessKeyId', e.target.value)}
             autoComplete="off"
@@ -212,11 +315,10 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           />
         </Field>
 
-        {/* Secret Key */}
         <Field label="Secret Access Key" required>
           <input
             type="password"
-            placeholder="••••••••••••••••••••"
+            placeholder="********************"
             value={form.secretAccessKey}
             onChange={(e) => update('secretAccessKey', e.target.value)}
             autoComplete="new-password"
@@ -227,11 +329,19 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
         {!isR2 && (
           <Field
             label="Region"
-            hint="Select a standard region or type a custom value"
+            hint={
+              isB2
+                ? 'Select a B2 region or type a custom value'
+                : (isWasabi
+                  ? 'Select a Wasabi region or type a custom value'
+                  : (isMinIO
+                    ? 'Set MinIO region (commonly us-east-1)'
+                    : (isSpaces ? 'Select a Spaces region (e.g. nyc3)' : 'Select a standard region or type a custom value')))
+            }
           >
             <div className="relative">
               <input
-                placeholder="us-east-1"
+                placeholder={isB2 ? 'us-west-004' : (isSpaces ? 'nyc3' : 'us-east-1')}
                 value={form.region}
                 onFocus={() => setRegionMenuOpen(true)}
                 onBlur={() => setTimeout(() => setRegionMenuOpen(false), 120)}
@@ -277,6 +387,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
             </div>
           </Field>
         )}
+
         {isR2 ? (
           <>
             <Field label="Account ID (Optional)" hint="Found in the Cloudflare dashboard">
@@ -287,7 +398,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
                 style={{ userSelect: 'auto' }}
               />
             </Field>
-            <Field label="Custom Endpoint" hint="Optional – overrides Account ID endpoint">
+            <Field label="Custom Endpoint" hint="Optional - overrides Account ID endpoint">
               <input
                 placeholder="https://<accountid>.r2.cloudflarestorage.com"
                 value={form.endpoint}
@@ -297,21 +408,40 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
             </Field>
           </>
         ) : (
-          <>
-            <Field label="Custom Endpoint" hint="Optional – for S3-compatible services or VPCs">
-              <input
-                placeholder="https://s3.example.com"
-                value={form.endpoint}
-                onChange={(e) => update('endpoint', e.target.value)}
-                style={{ userSelect: 'auto' }}
-              />
-            </Field>
-          </>
+          <Field
+            label="Custom Endpoint"
+            hint={
+              isB2
+                ? 'Optional - defaults to s3.<region>.backblazeb2.com'
+                : (isWasabi
+                  ? 'Optional - defaults to s3.<region>.wasabisys.com'
+                  : (isMinIO
+                    ? 'Optional - defaults to http://127.0.0.1:9000'
+                    : (isSpaces
+                      ? 'Optional - defaults to https://<region>.digitaloceanspaces.com'
+                      : 'Optional - for S3-compatible services or VPCs')))
+            }
+          >
+            <input
+              placeholder={
+                isB2
+                  ? 'https://s3.us-west-004.backblazeb2.com'
+                  : (isWasabi
+                    ? 'https://s3.us-east-1.wasabisys.com'
+                    : (isMinIO
+                      ? 'http://127.0.0.1:9000'
+                      : (isSpaces ? 'https://nyc3.digitaloceanspaces.com' : 'https://s3.example.com')))
+              }
+              value={form.endpoint}
+              onChange={(e) => update('endpoint', e.target.value)}
+              style={{ userSelect: 'auto' }}
+            />
+          </Field>
         )}
 
         <Field
           label="Bucket Name"
-          hint="Optional – if set, CloudEx uses only this bucket and skips ListAllMyBuckets"
+          hint="Optional - if set, CloudEx uses only this bucket and skips ListAllMyBuckets"
         >
           <input
             placeholder="my-app-bucket"
@@ -321,7 +451,6 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           />
         </Field>
 
-        {/* Test result */}
         {testResult && (
           <div className={`flex items-center gap-2 p-3 rounded-lg text-xs ${
             testResult.success
@@ -337,7 +466,6 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
           <Button variant="ghost" size="sm" onClick={handleTest} loading={testing}>
             Test Connection
@@ -372,10 +500,9 @@ function Field({
       <label className="flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] mb-1.5">
         {label}
         {required && <span className="text-[var(--danger)]">*</span>}
-        {hint && <span className="text-[var(--text-muted)] font-normal">— {hint}</span>}
+        {hint && <span className="text-[var(--text-muted)] font-normal">- {hint}</span>}
       </label>
       {children}
     </div>
   )
 }
-

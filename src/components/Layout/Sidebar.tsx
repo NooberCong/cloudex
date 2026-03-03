@@ -19,12 +19,26 @@ interface SidebarProps {
 const providerIcon = (type: ProviderConfig['type']) =>
   type === 'aws-s3' ? (
     <Cloud className="w-3.5 h-3.5 text-[#FF9900]" />
+  ) : type === 'digitalocean-spaces' ? (
+    <HardDrive className="w-3.5 h-3.5 text-[#0080FF]" />
+  ) : type === 'minio-s3' ? (
+    <HardDrive className="w-3.5 h-3.5 text-[#C72E49]" />
+  ) : type === 'wasabi-s3' ? (
+    <HardDrive className="w-3.5 h-3.5 text-[#74B72E]" />
+  ) : type === 'backblaze-b2' ? (
+    <HardDrive className="w-3.5 h-3.5 text-[#E85C33]" />
   ) : (
     <HardDrive className="w-3.5 h-3.5 text-[#F48120]" />
   )
 
 const providerLabel = (type: ProviderConfig['type']) =>
-  type === 'aws-s3' ? 'AWS S3' : 'Cloudflare R2'
+  type === 'aws-s3'
+    ? 'AWS S3'
+    : (type === 'backblaze-b2'
+      ? 'Backblaze B2'
+      : (type === 'wasabi-s3'
+        ? 'Wasabi'
+        : (type === 'minio-s3' ? 'MinIO' : (type === 'digitalocean-spaces' ? 'DigitalOcean Spaces' : 'Cloudflare R2'))))
 
 export function Sidebar({
   onAddProvider,
@@ -127,7 +141,7 @@ export function Sidebar({
               <button
                 onClick={() => handleProviderClick(provider)}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-1.5 text-left group',
+                  'relative w-full flex items-center gap-2 px-3 py-1.5 text-left group',
                   'hover:bg-[var(--bg-hover)] transition-colors',
                   'text-[var(--text-primary)]'
                 )}
@@ -140,13 +154,15 @@ export function Sidebar({
                   )}
                 </span>
                 {providerIcon(provider.type)}
-                <span className="flex-1 text-xs font-medium truncate" title={provider.name}>
-                  {provider.name}
-                </span>
-                <span className="text-[10px] text-[var(--text-muted)] shrink-0">
-                  {providerLabel(provider.type)}
-                </span>
-                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <span className="flex-1 text-xs font-medium truncate" title={provider.name}>
+                    {provider.name}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] shrink-0 transition-opacity group-hover:opacity-0">
+                    {providerLabel(provider.type)}
+                  </span>
+                </div>
+                <div className="absolute right-2 flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={async (e) => {
                       e.preventDefault()

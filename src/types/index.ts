@@ -1,6 +1,12 @@
 // ─── Provider / Credential Types ────────────────────────────────────────────
 
-export type ProviderType = 'aws-s3' | 'cloudflare-r2'
+export type ProviderType =
+  | 'aws-s3'
+  | 'cloudflare-r2'
+  | 'backblaze-b2'
+  | 'wasabi-s3'
+  | 'minio-s3'
+  | 'digitalocean-spaces'
 
 export interface ProviderConfig {
   id: string
@@ -8,7 +14,7 @@ export interface ProviderConfig {
   type: ProviderType
   accessKeyId: string
   secretAccessKey: string
-  /** AWS region (e.g. us-east-1) or "auto" for R2 */
+  /** AWS/B2 region (e.g. us-east-1, us-west-004) or "auto" for R2 */
   region: string
   /** Custom endpoint URL – required for R2, optional for S3 custom endpoints */
   endpoint?: string

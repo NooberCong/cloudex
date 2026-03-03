@@ -14,6 +14,15 @@ interface SettingsPageProps {
   onThemeChange: (t: Theme) => void
 }
 
+const providerLabel = (type: ProviderConfig['type']) =>
+  type === 'aws-s3'
+    ? 'AWS S3'
+    : (type === 'backblaze-b2'
+      ? 'Backblaze B2'
+      : (type === 'wasabi-s3'
+        ? 'Wasabi'
+        : (type === 'minio-s3' ? 'MinIO' : (type === 'digitalocean-spaces' ? 'DigitalOcean Spaces' : 'Cloudflare R2'))))
+
 export function SettingsPage({
   onClose, onEditProvider, onAddProvider, onDeleteProvider, deletingProviderId, theme, onThemeChange
 }: SettingsPageProps) {
@@ -21,19 +30,17 @@ export function SettingsPage({
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-primary)] animate-fade-in">
-      {/* Header */}
       <div
         className="flex items-center justify-between px-6 border-b border-[var(--border)] drag-region shrink-0"
         style={{ height: 'var(--titlebar-height)' }}
       >
         <h1 className="text-sm font-semibold text-[var(--text-primary)] no-drag">Settings</h1>
         <Button variant="ghost" size="sm" onClick={onClose} className="no-drag">
-          ← Back
+          {'< Back'}
         </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
-        {/* Providers */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -58,6 +65,14 @@ export function SettingsPage({
                   <div className="w-8 h-8 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
                     {p.type === 'aws-s3' ? (
                       <Cloud className="w-4 h-4 text-[#FF9900]" />
+                    ) : p.type === 'digitalocean-spaces' ? (
+                      <HardDrive className="w-4 h-4 text-[#0080FF]" />
+                    ) : p.type === 'minio-s3' ? (
+                      <HardDrive className="w-4 h-4 text-[#C72E49]" />
+                    ) : p.type === 'wasabi-s3' ? (
+                      <HardDrive className="w-4 h-4 text-[#74B72E]" />
+                    ) : p.type === 'backblaze-b2' ? (
+                      <HardDrive className="w-4 h-4 text-[#E85C33]" />
                     ) : (
                       <HardDrive className="w-4 h-4 text-[#F48120]" />
                     )}
@@ -67,10 +82,10 @@ export function SettingsPage({
                       {p.name}
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">
-                      {p.type === 'aws-s3' ? 'AWS S3' : 'Cloudflare R2'} · {p.region}
-                      {p.endpoint ? ` · ${new URL(p.endpoint).hostname}` : ''}
+                      {providerLabel(p.type)} - {p.region}
+                      {p.endpoint ? ` - ${new URL(p.endpoint).hostname}` : ''}
                       {(p.defaultBucket || p.allowedBuckets?.[0])
-                        ? ` · bucket: ${p.defaultBucket || p.allowedBuckets?.[0]}`
+                        ? ` - bucket: ${p.defaultBucket || p.allowedBuckets?.[0]}`
                         : ''}
                     </p>
                   </div>
@@ -97,7 +112,6 @@ export function SettingsPage({
           )}
         </section>
 
-        {/* Appearance */}
         <section>
           <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
             Appearance
@@ -107,7 +121,7 @@ export function SettingsPage({
             <div className="flex gap-2">
               {([
                 { value: 'light', label: 'Light', icon: <Sun className="w-3.5 h-3.5" /> },
-                { value: 'dark',  label: 'Dark',  icon: <Moon className="w-3.5 h-3.5" /> },
+                { value: 'dark', label: 'Dark', icon: <Moon className="w-3.5 h-3.5" /> },
                 { value: 'system', label: 'System', icon: <Monitor className="w-3.5 h-3.5" /> }
               ] as const).map((opt) => (
                 <button
@@ -127,14 +141,15 @@ export function SettingsPage({
           </div>
         </section>
 
-        {/* About */}
         <section>
           <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
             About
           </h2>
           <div className="p-3 rounded-xl border border-[var(--border)] space-y-1">
             <p className="text-sm font-medium text-[var(--text-primary)]">CloudEx</p>
-            <p className="text-xs text-[var(--text-muted)]">Desktop file manager for AWS S3 &amp; Cloudflare R2</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Desktop file manager for AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, and DigitalOcean Spaces
+            </p>
           </div>
         </section>
       </div>

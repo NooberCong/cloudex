@@ -2,6 +2,10 @@ import type { ProviderConfig } from '../../../src/types'
 import { StorageProvider } from './base'
 import { S3Provider } from './s3'
 import { R2Provider } from './r2'
+import { B2Provider } from './b2'
+import { WasabiProvider } from './wasabi'
+import { MinIOProvider } from './minio'
+import { SpacesProvider } from './spaces'
 
 // Cache provider instances so we don't recreate clients on every call
 const cache = new Map<string, StorageProvider>()
@@ -25,6 +29,14 @@ function createProvider(config: ProviderConfig): StorageProvider {
       return new S3Provider(config)
     case 'cloudflare-r2':
       return new R2Provider(config)
+    case 'backblaze-b2':
+      return new B2Provider(config)
+    case 'wasabi-s3':
+      return new WasabiProvider(config)
+    case 'minio-s3':
+      return new MinIOProvider(config)
+    case 'digitalocean-spaces':
+      return new SpacesProvider(config)
     default:
       throw new Error(`Unknown provider type: ${(config as any).type}`)
   }

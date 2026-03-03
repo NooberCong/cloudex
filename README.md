@@ -3,16 +3,17 @@
 </p>
 <h1 align="center">CloudEx</h1>
 <p align="center">
-  <img alt="Electron" src="https://img.shields.io/badge/Electron-35+-47848F?logo=electron&logoColor=white" /> <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" /> <img alt="AWS S3" src="https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white" /> <img alt="Cloudflare R2" src="https://img.shields.io/badge/Cloudflare-R2-F38020?logo=cloudflare&logoColor=white" /> <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E" />
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-35+-47848F?logo=electron&logoColor=white" /> <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" /> <img alt="AWS S3" src="https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white" /> <img alt="Cloudflare R2" src="https://img.shields.io/badge/Cloudflare-R2-F38020?logo=cloudflare&logoColor=white" /> <img alt="Backblaze B2" src="https://img.shields.io/badge/Backblaze-B2-E85C33" /> <img alt="Wasabi" src="https://img.shields.io/badge/Wasabi-74B72E" /> <img alt="MinIO" src="https://img.shields.io/badge/MinIO-C72E49" /> <img alt="DigitalOcean Spaces" src="https://img.shields.io/badge/DO-Spaces-0080FF" /> <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E" />
 </p>
 
-CloudEx is a desktop file manager for S3-compatible object storage, focused on AWS S3 and Cloudflare R2.
+CloudEx is a desktop file manager for S3-compatible object storage, focused on AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, and DigitalOcean Spaces.
 
 It is built with Electron, React, TypeScript, Zustand, and the AWS SDK v3.
 
 ## Highlights
 
-- Multi-connection support for AWS S3 and Cloudflare R2
+- Multi-connection support for AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, and DigitalOcean Spaces
+- Provider type selector with icon-based dropdown in connection settings
 - Bucket and object browsing with search, pagination, and auto load more
 - List and grid views
 - Upload and download with transfer progress
