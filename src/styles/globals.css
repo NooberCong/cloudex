@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Custom CSS variables for theming ───────────────────────────────────────── */
+:root {
+  --bg-primary: #f5f6f8;
+  --bg-secondary: #eceff3;
+  --bg-tertiary: #e4e8ee;
+  --bg-hover: #dde3eb;
+  --bg-selected: #e5edf9;
+  --bg-selected-border: #afc6ea;
+  --text-primary: #1d2430;
+  --text-secondary: #556070;
+  --text-muted: #7a8698;
+  --border: #cfd7e2;
+  --border-strong: #bcc7d5;
+  --accent: #3a76cf;
+  --accent-hover: #2f63b2;
+  --accent-light: #e5edf9;
+  --danger: #c85b5b;
+  --danger-light: #f3e7e7;
+  --success: #4e9a73;
+  --warning: #f59e0b;
+  --sidebar-width: 260px;
+  --titlebar-height: 38px;
+}
+
+.dark {
+  --bg-primary: #0f1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2128;
+  --bg-hover: #21262d;
+  --bg-selected: #1c2e4a;
+  --bg-selected-border: #1f6feb;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --border: #30363d;
+  --border-strong: #484f58;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --accent-light: #1c2e4a;
+  --danger: #f85149;
+  --danger-light: #2d1313;
+  --success: #3fb950;
+  --warning: #d29922;
+}
+
+/* ── Base resets ──────────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  user-select: none;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Drag region for frameless windows ─────────────────────────────────────── */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ── Utility classes ─────────────────────────────────────────────────────────── */
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted); }
+.bg-primary     { background: var(--bg-primary); }
+.bg-secondary   { background: var(--bg-secondary); }
+.bg-tertiary    { background: var(--bg-tertiary); }
+.border-default { border-color: var(--border); }
+
+/* ── Focus rings ─────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ── Input base ─────────────────────────────────────────────────────────────── */
+input, textarea, select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  transition: border-color 0.15s;
+  outline: none;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* ── Drop overlay ────────────────────────────────────────────────────────────── */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 2px dashed var(--accent);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(6px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes dialogIn {
+  from { transform: translate(-50%, calc(-50% + 6px)); opacity: 0; }
+  to   { transform: translate(-50%, -50%); opacity: 1; }
+}
+.animate-fade-in { animation: fadeIn 0.15s ease-out; }
+.animate-slide-up { animation: slideUp 0.2s ease-out; }
+.animate-dialog-in { animation: dialogIn 0.2s ease-out; }
