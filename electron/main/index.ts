@@ -4,12 +4,27 @@ import * as fs from 'fs'
 import { registerIpcHandlers } from './ipc-handlers'
 import { getWindowState, saveWindowState } from './store'
 
-let mainWindow
+let mainWindow: BrowserWindow | null
+
+function resolveWindowIconPath(): string | undefined {
+  const isWin = process.platform === 'win32'
+  const iconFile = isWin ? 'icon.ico' : 'icon.png'
+  const devIcon = join(app.getAppPath(), 'build', iconFile)
+
+  const candidates = app.isPackaged
+    ? [
+        join(process.resourcesPath, iconFile),
+        join(process.resourcesPath, 'build', iconFile),
+        join(app.getAppPath(), 'build', iconFile)
+      ]
+    : [devIcon]
+
+  return candidates.find((p) => fs.existsSync(p))
+}
 
 function createWindow(): void {
   const persistedWindow = getWindowState()
-  const devIconPath = join(app.getAppPath(), 'build', 'icon.png')
-  const windowIcon = fs.existsSync(devIconPath) ? devIconPath : undefined
+  const windowIcon = resolveWindowIconPath()
 
   mainWindow = new BrowserWindow({
     width: persistedWindow.width || 1280,

@@ -1,4 +1,10 @@
-# CloudEx
+<p align="center">
+  <img src="./build/icon.png" alt="CloudEx Icon" width="112" />
+</p>
+<h1 align="center">CloudEx</h1>
+<p align="center">
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-35+-47848F?logo=electron&logoColor=white" /> <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" /> <img alt="AWS S3" src="https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white" /> <img alt="Cloudflare R2" src="https://img.shields.io/badge/Cloudflare-R2-F38020?logo=cloudflare&logoColor=white" /> <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E" />
+</p>
 
 CloudEx is a desktop file manager for S3-compatible object storage, focused on AWS S3 and Cloudflare R2.
 
@@ -18,6 +24,20 @@ It is built with Electron, React, TypeScript, Zustand, and the AWS SDK v3.
 - Context menus and keyboard shortcuts
 - Light/dark theme support
 - Local encrypted storage for connection settings (`electron-store`)
+
+## Screenshots
+
+### Main List View
+![Main List View](./assets/screenshots/main-list.png)
+
+### Main Grid View
+![Main Grid View](./assets/screenshots/main-grid.png)
+
+### Settings and Connections
+![Settings Connections](./assets/screenshots/settings-connections.png)
+
+### Transfer Queue
+![Transfers](./assets/screenshots/transfers.png)
 
 ## Tech Stack
 
