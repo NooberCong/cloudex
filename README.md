@@ -17,9 +17,12 @@ It is built with Electron, React, TypeScript, Zustand, and the AWS SDK v3.
 - List and grid views
 - Upload and download with transfer progress
 - Drag and drop file upload
+- Drag items onto folders to move them
 - Folder upload support
 - Copy, cut, paste, rename, delete, and create folder
 - Multi-select operations and bulk download (zip)
+- Windows-style click-drag rectangle multi-select
+- Clipboard panel with expandable item list and in-progress operation indicator
 - Presigned URL generation with configurable expiration
 - Context menus and keyboard shortcuts
 - Light/dark theme support
@@ -73,6 +76,19 @@ npm run dev
 - `npm run build:win`: Alias of `dist:win`
 - `npm run build:mac`: Alias of `dist:mac`
 - `npm run build:linux`: Alias of `dist:linux`
+
+## Keyboard Shortcuts
+
+- `Ctrl/Cmd + A`: Select all
+- `Ctrl/Cmd + C`: Copy selected items
+- `Ctrl/Cmd + X`: Cut selected items
+- `Ctrl/Cmd + V`: Paste clipboard items
+- `Delete` or `Backspace`: Delete selected items
+- `Ctrl/Cmd + D`: Delete selected items
+- `F5` or `Ctrl/Cmd + R`: Refresh current folder
+- `Escape`: Clear current selection
+- `Shift + Click`: Select range
+- `Ctrl/Cmd + Click`: Toggle item selection
 
 ## Packaging Output
 

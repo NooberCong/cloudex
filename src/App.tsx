@@ -15,6 +15,7 @@ import { useTransfersStore } from './store/transfers'
 import { useProvidersStore } from './store/providers'
 import { generateId } from './lib/utils'
 import { useToast } from './components/UI/Toast'
+import { Loader2 } from 'lucide-react'
 import type { S3Object, ProviderConfig, Theme } from './types'
 
 export function App() {
@@ -174,6 +175,11 @@ export function App() {
     path: string
     resolve: (choice: UploadConflictChoice) => void
   } | null>(null)
+  const [clipboardExpanded, setClipboardExpanded] = useState(false)
+  const [clipboardBusy, setClipboardBusy] = useState<{
+    action: 'paste' | 'move'
+    count: number
+  } | null>(null)
 
   const requestUploadConflict = useCallback((path: string) => {
     return new Promise<UploadConflictChoice>((resolve) => {
@@ -187,6 +193,10 @@ export function App() {
       return null
     })
   }, [])
+
+  useEffect(() => {
+    setClipboardExpanded(false)
+  }, [clipboard?.action, clipboard?.keys.join('|'), clipboard?.location.providerId, clipboard?.location.bucket, clipboard?.location.prefix])
 
   const uploadFromPaths = useCallback(async (filePaths: string[]) => {
     if (!location) return
@@ -399,64 +409,70 @@ export function App() {
 
   // ── Paste (copy/move) ────────────────────────────────────────────────────────
   const handlePaste = useCallback(async () => {
-    if (!location || !clipboard) return
+    if (!location || !clipboard || clipboardBusy) return
     const { action, keys, location: src } = clipboard
 
+    setClipboardBusy({ action: 'paste', count: keys.length })
     let changedCount = 0
     let skippedSameTarget = 0
-    for (const srcKey of keys) {
-      const srcTrimmed = srcKey.endsWith('/') ? srcKey.slice(0, -1) : srcKey
-      const leafName = srcTrimmed.split('/').pop() || srcTrimmed
-      const fileName = srcKey.endsWith('/') ? `${leafName}/` : leafName
-      let destKey = location.prefix + fileName
-      const isSameTarget =
-        src.providerId === location.providerId &&
-        src.bucket === location.bucket &&
-        srcKey === destKey
+    try {
+      for (const srcKey of keys) {
+        const srcTrimmed = srcKey.endsWith('/') ? srcKey.slice(0, -1) : srcKey
+        const leafName = srcTrimmed.split('/').pop() || srcTrimmed
+        const fileName = srcKey.endsWith('/') ? `${leafName}/` : leafName
+        let destKey = location.prefix + fileName
+        const isSameTarget =
+          src.providerId === location.providerId &&
+          src.bucket === location.bucket &&
+          srcKey === destKey
 
-      if (isSameTarget) {
-        if (action === 'copy') {
-          destKey = await resolveSameFolderCopyKey(location.providerId, location.bucket, srcKey)
-        } else {
-          skippedSameTarget++
-          continue
+        if (isSameTarget) {
+          if (action === 'copy') {
+            destKey = await resolveSameFolderCopyKey(location.providerId, location.bucket, srcKey)
+          } else {
+            skippedSameTarget++
+            continue
+          }
+        }
+
+        try {
+          await window.api.objects.copy({
+            srcProviderId: src.providerId,
+            srcBucket: src.bucket,
+            srcKey,
+            destProviderId: location.providerId,
+            destBucket: location.bucket,
+            destKey
+          })
+          if (action === 'move') {
+            await window.api.objects.delete(src.providerId, src.bucket, [srcKey])
+          }
+          changedCount++
+        } catch (e: any) {
+          toast.error(`Failed to ${action} ${fileName}`, e?.message)
         }
       }
 
-      try {
-        await window.api.objects.copy({
-          srcProviderId: src.providerId,
-          srcBucket: src.bucket,
-          srcKey,
-          destProviderId: location.providerId,
-          destBucket: location.bucket,
-          destKey
-        })
-        if (action === 'move') {
-          await window.api.objects.delete(src.providerId, src.bucket, [srcKey])
-        }
-        changedCount++
-      } catch (e: any) {
-        toast.error(`Failed to ${action} ${fileName}`, e?.message)
-      }
-    }
-
-    if (changedCount > 0) {
-      toast.success(`${action === 'copy' ? 'Copied' : 'Moved'} ${changedCount} item${changedCount > 1 ? 's' : ''}`)
-      clearClipboard()
-      refresh()
-      return
-    }
-
-    if (skippedSameTarget > 0) {
-      if (action === 'move') {
+      if (changedCount > 0) {
+        toast.success(`${action === 'copy' ? 'Copied' : 'Moved'} ${changedCount} item${changedCount > 1 ? 's' : ''}`)
         clearClipboard()
+        refresh()
         return
       }
-      toast.info('Same location: nothing to paste')
-      return
+
+      if (skippedSameTarget > 0) {
+        if (action === 'move') {
+          clearClipboard()
+          return
+        } else {
+          toast.info('Same location: nothing to paste')
+          return
+        }
+      }
+    } finally {
+      setClipboardBusy(null)
     }
-  }, [location, clipboard, toast, clearClipboard, refresh, resolveSameFolderCopyKey])
+  }, [location, clipboard, toast, clearClipboard, refresh, resolveSameFolderCopyKey, clipboardBusy])
 
   const handleCopy = useCallback(() => {
     if (!location || selectedKeys.length === 0) return
@@ -467,6 +483,47 @@ export function App() {
     if (!location || selectedKeys.length === 0) return
     setClipboard('move', [...selectedKeys])
   }, [location, selectedKeys, setClipboard])
+
+  const handleMoveToFolder = useCallback(async (keys: string[], targetFolderKey: string) => {
+    if (!location || keys.length === 0 || clipboardBusy) return
+
+    setClipboardBusy({ action: 'move', count: keys.length })
+    let movedCount = 0
+    try {
+      for (const srcKey of keys) {
+        const srcTrimmed = srcKey.endsWith('/') ? srcKey.slice(0, -1) : srcKey
+        const leafName = srcTrimmed.split('/').pop() || srcTrimmed
+        const destKey = targetFolderKey + (srcKey.endsWith('/') ? `${leafName}/` : leafName)
+
+        if (srcKey === destKey) continue
+        if (srcKey.endsWith('/') && targetFolderKey.startsWith(srcKey)) {
+          toast.error(`Failed to move ${leafName}`, 'Cannot move a folder into itself.')
+          continue
+        }
+
+        try {
+          await window.api.objects.copy({
+            srcProviderId: location.providerId,
+            srcBucket: location.bucket,
+            srcKey,
+            destProviderId: location.providerId,
+            destBucket: location.bucket,
+            destKey
+          })
+          await window.api.objects.delete(location.providerId, location.bucket, [srcKey])
+          movedCount++
+        } catch (e: any) {
+          toast.error(`Failed to move ${leafName}`, e?.message)
+        }
+      }
+      if (movedCount > 0) {
+        toast.success(`Moved ${movedCount} item${movedCount > 1 ? 's' : ''}`)
+        refresh()
+      }
+    } finally {
+      setClipboardBusy(null)
+    }
+  }, [location, toast, refresh, clipboardBusy])
 
   // ── Drag and drop upload ──────────────────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false)
@@ -510,11 +567,19 @@ export function App() {
     return [...pathSet]
   }
 
+  const isLikelyExternalFileDrop = (dataTransfer: DataTransfer): boolean => {
+    const types = Array.from(dataTransfer.types || [])
+    if (types.includes('Files')) return true
+    const uriList = dataTransfer.getData('text/uri-list') || ''
+    return uriList.split(/\r?\n/).some((raw) => raw.trim().toLowerCase().startsWith('file://'))
+  }
+
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault()
     dragCounter.current = 0
     setIsDragging(false)
     if (!location) return
+    if (!isLikelyExternalFileDrop(e.dataTransfer)) return
 
     const filePaths = extractDroppedFilePaths(e.dataTransfer)
     if (filePaths.length === 0) {
@@ -535,6 +600,7 @@ export function App() {
       dragCounter.current = 0
       setIsDragging(false)
       if (!location || !e.dataTransfer) return
+      if (!isLikelyExternalFileDrop(e.dataTransfer)) return
 
       const filePaths = extractDroppedFilePaths(e.dataTransfer)
       if (filePaths.length === 0) return
@@ -597,27 +663,61 @@ export function App() {
               onPresignedUrl={(obj) => { setPresignTarget(obj); setPresignOpen(true) }}
               onPaste={handlePaste}
               onNewFolder={() => setNewFolderOpen(true)}
+              onMoveToFolder={handleMoveToFolder}
             />
+            {clipboardBusy && (
+              <div className="border-t border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--accent)]" />
+                <span>
+                  {clipboardBusy.action === 'paste' ? 'Applying paste' : 'Moving'} {clipboardBusy.count} item{clipboardBusy.count > 1 ? 's' : ''}...
+                </span>
+              </div>
+            )}
             {clipboard && (
-              <div className="border-t border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-xs flex items-center justify-between gap-3">
-                <div className="min-w-0 text-[var(--text-secondary)]">
-                  <div className="truncate">
-                    {clipboard.action === 'copy' ? 'Copied' : 'Cut'} {clipboard.keys.length} item{clipboard.keys.length > 1 ? 's' : ''}
+              <div className="border-t border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 text-[var(--text-secondary)]">
+                    <div className="truncate">
+                      {clipboard.action === 'copy' ? 'Copied' : 'Cut'} {clipboard.keys.length} item{clipboard.keys.length > 1 ? 's' : ''}
+                    </div>
+                    <div className="truncate text-[var(--text-primary)]">
+                      {clipboard.keys.length === 1
+                        ? `${clipboard.location.bucket}/${clipboard.keys[0]}`
+                        : `${clipboard.location.bucket}/${clipboard.keys[0]} (+${clipboard.keys.length - 1} more)`}
+                    </div>
                   </div>
-                  <div className="truncate text-[var(--text-primary)]">
-                    {clipboard.keys.length === 1
-                      ? `${clipboard.location.bucket}/${clipboard.keys[0]}`
-                      : `${clipboard.location.bucket}/${clipboard.keys[0]} (+${clipboard.keys.length - 1} more)`}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {clipboard.keys.length > 1 && (
+                      <button
+                        onClick={() => setClipboardExpanded((v) => !v)}
+                        className="px-2 py-1 rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      >
+                        {clipboardExpanded ? 'Collapse' : 'Expand'}
+                      </button>
+                    )}
+                    <button
+                      onClick={clearClipboard}
+                      disabled={!!clipboardBusy}
+                      className="px-2 py-1 rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      Clear
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={clearClipboard}
-                    className="px-2 py-1 rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
+
+                {clipboardExpanded && clipboard.keys.length > 1 && (
+                  <div className="mt-2 rounded border border-[var(--border)] bg-[var(--bg-primary)] max-h-40 overflow-auto">
+                    {clipboard.keys.map((key) => (
+                      <div
+                        key={key}
+                        className="px-2 py-1 border-b border-[var(--border)] last:border-b-0 text-[var(--text-primary)] truncate"
+                        title={`${clipboard.location.bucket}/${key}`}
+                      >
+                        {clipboard.location.bucket}/{key}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </>

@@ -169,6 +169,81 @@ async function collectFolderFiles(
   return files
 }
 
+type FolderCopyProvider = {
+  listObjects: (
+    bucket: string,
+    prefix: string,
+    continuationToken?: string,
+    searchQuery?: string
+  ) => Promise<{ objects: S3Object[]; nextContinuationToken?: string }>
+  copyObject: (options: CopyOptions) => Promise<void>
+  createFolder: (bucket: string, prefix: string) => Promise<void>
+}
+
+async function listAllObjectsInPrefix(
+  provider: FolderCopyProvider,
+  bucket: string,
+  prefix: string
+): Promise<S3Object[]> {
+  const objects: S3Object[] = []
+  let token: string | undefined = undefined
+  do {
+    const result = await provider.listObjects(bucket, prefix, token)
+    objects.push(...result.objects)
+    token = result.nextContinuationToken
+  } while (token)
+  return objects
+}
+
+async function copyFolderRecursive(
+  provider: FolderCopyProvider,
+  providerId: string,
+  srcBucket: string,
+  destBucket: string,
+  srcPrefix: string,
+  destPrefix: string
+): Promise<void> {
+  const normalizedSrc = srcPrefix.endsWith('/') ? srcPrefix : `${srcPrefix}/`
+  const normalizedDest = destPrefix.endsWith('/') ? destPrefix : `${destPrefix}/`
+
+  await provider.createFolder(destBucket, normalizedDest)
+
+  const queue: string[] = [normalizedSrc]
+  const visited = new Set<string>()
+
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if (visited.has(current)) continue
+    visited.add(current)
+
+    const objects = await listAllObjectsInPrefix(provider, srcBucket, current)
+    for (const obj of objects) {
+      if (!obj.key.startsWith(normalizedSrc)) continue
+      const rel = obj.key.slice(normalizedSrc.length)
+      if (!rel) continue
+
+      if (obj.isFolder) {
+        const nextSrcPrefix = obj.key.endsWith('/') ? obj.key : `${obj.key}/`
+        const nextDestPrefix = `${normalizedDest}${rel}`.endsWith('/')
+          ? `${normalizedDest}${rel}`
+          : `${normalizedDest}${rel}/`
+        await provider.createFolder(destBucket, nextDestPrefix)
+        if (!visited.has(nextSrcPrefix)) queue.push(nextSrcPrefix)
+        continue
+      }
+
+      await provider.copyObject({
+        srcProviderId: providerId,
+        srcBucket,
+        srcKey: obj.key,
+        destProviderId: providerId,
+        destBucket,
+        destKey: `${normalizedDest}${rel}`
+      })
+    }
+  }
+}
+
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   const openTempRoot = path.join(app.getPath('temp'), OPEN_TEMP_DIR_NAME)
   const zipTempRoot = path.join(app.getPath('temp'), ZIP_TEMP_DIR_NAME)
@@ -274,7 +349,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     // If same provider → use server-side copy
     if (options.srcProviderId === options.destProviderId) {
       const provider = getProviderInstance(srcConfig)
-      await provider.copyObject(options)
+      if (options.srcKey.endsWith('/')) {
+        await copyFolderRecursive(
+          provider,
+          options.srcProviderId,
+          options.srcBucket,
+          options.destBucket,
+          options.srcKey,
+          options.destKey
+        )
+      } else {
+        await provider.copyObject(options)
+      }
     } else {
       // Cross-provider copy: download to temp then upload
       throw new Error('Cross-provider copy not yet supported in this version.')
@@ -287,14 +373,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const config = getProvider(providerId)
       if (!config) throw new Error(`Provider not found: ${providerId}`)
       const provider = getProviderInstance(config)
-      await provider.copyObject({
-        srcProviderId: providerId,
-        srcBucket: bucket,
-        srcKey,
-        destProviderId: providerId,
-        destBucket: bucket,
-        destKey
-      })
+      if (srcKey.endsWith('/')) {
+        await copyFolderRecursive(provider, providerId, bucket, bucket, srcKey, destKey)
+      } else {
+        await provider.copyObject({
+          srcProviderId: providerId,
+          srcBucket: bucket,
+          srcKey,
+          destProviderId: providerId,
+          destBucket: bucket,
+          destKey
+        })
+      }
       await provider.deleteObjects(bucket, [srcKey])
     }
   )

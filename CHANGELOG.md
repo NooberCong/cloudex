@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.0] - 2026-03-03
+
+### Added
+
+- Drag-and-drop move: drag file/folder items onto a folder row to move them
+- Windows-style marquee (click-drag rectangle) selection in file list/grid view
+- Clipboard status panel expansion for multi-item copy/cut, showing full item list
+- Clipboard operation progress indicator while paste/move actions are running
+- Explicit keyboard shortcut documentation in README
+
+### Changed
+
+- Clipboard operation status row now renders above the clipboard item-list bar
+- Internal item drag dropped on current/empty area is treated as no-op (no upload error)
+- Multi-select UX refined to preserve normal click selection while supporting marquee drag
+
+### Fixed
+
+- Critical folder move/cut data-loss bug where nested objects could disappear
+- Folder copy/rename now recursively copies nested contents before source delete
+- Recursive folder move/copy now works across buckets within the same provider
+- Marquee selection finalization on mouse release over rows now correctly applies selection
+
 ## [1.0.0] - 2026-03-03
 
 First public release of CloudEx.
@@ -49,3 +72,4 @@ First public release of CloudEx.
 - Connection test timeout handling to avoid stuck states
 
 [1.0.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.0.0
+[1.1.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.1.0

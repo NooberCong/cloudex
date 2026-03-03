@@ -29,10 +29,11 @@ interface FileListProps {
   onPresignedUrl: (obj: S3Object) => void
   onPaste: () => void
   onNewFolder: () => void
+  onMoveToFolder: (keys: string[], folderKey: string) => void
 }
 
 export function FileList({
-  onRename, onDelete, onDownload, onProperties, onPresignedUrl, onPaste, onNewFolder
+  onRename, onDelete, onDownload, onProperties, onPresignedUrl, onPaste, onNewFolder, onMoveToFolder
 }: FileListProps) {
   const toast = useToast()
   const [openingKey, setOpeningKey] = useState<string | null>(null)
@@ -73,6 +74,20 @@ export function FileList({
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
   const loadingMoreRef = useRef(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [dropTargetFolderKey, setDropTargetFolderKey] = useState<string | null>(null)
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const initialMarqueeSelectionRef = useRef<string[]>([])
+  const lastMarqueeSelectionSigRef = useRef<string>('')
+  const marqueeMovedRef = useRef(false)
+  const suppressClickRef = useRef(false)
+  const suppressClickTimerRef = useRef<number | null>(null)
+  const [marquee, setMarquee] = useState<{
+    startX: number
+    startY: number
+    currentX: number
+    currentY: number
+    append: boolean
+  } | null>(null)
 
   const tryLoadMore = useCallback(async () => {
     if (!isTruncated || loading || !!error) return
@@ -156,6 +171,10 @@ export function FileList({
   }, [location, selectedKeys, clipboard, onPaste, onDelete, refresh, clearSelection, selectAll, setClipboard])
 
   const handleRowClick = useCallback((key: string, e: React.MouseEvent) => {
+    if (suppressClickRef.current) {
+      e.preventDefault()
+      return
+    }
     selectKey(key, e.ctrlKey || e.metaKey, e.shiftKey)
   }, [selectKey])
 
@@ -176,6 +195,108 @@ export function FileList({
       setOpeningKey(null)
     }
   }, [navigate, location, toast, openingKey])
+
+  const dragMimeType = 'application/x-cloudex-keys'
+
+  const setItemRef = useCallback((key: string, el: HTMLDivElement | null) => {
+    if (el) itemRefs.current.set(key, el)
+    else itemRefs.current.delete(key)
+  }, [])
+
+  const applyExactSelection = useCallback((keys: string[]) => {
+    clearSelection()
+    keys.forEach((key, idx) => selectKey(key, idx > 0, false))
+  }, [clearSelection, selectKey])
+
+  const rectsIntersect = (a: { left: number; right: number; top: number; bottom: number }, b: DOMRect) => {
+    return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom)
+  }
+
+  useEffect(() => {
+    if (!marquee) return
+
+    const applyFromPoint = (currentX: number, currentY: number) => {
+      const selectionRect = {
+        left: Math.min(marquee.startX, currentX),
+        right: Math.max(marquee.startX, currentX),
+        top: Math.min(marquee.startY, currentY),
+        bottom: Math.max(marquee.startY, currentY)
+      }
+
+      const intersected: string[] = []
+      for (const obj of visibleObjects) {
+        const el = itemRefs.current.get(obj.key)
+        if (!el) continue
+        if (rectsIntersect(selectionRect, el.getBoundingClientRect())) {
+          intersected.push(obj.key)
+        }
+      }
+
+      const nextKeys = marquee.append
+        ? [...new Set([...initialMarqueeSelectionRef.current, ...intersected])]
+        : intersected
+      const sig = nextKeys.join('|')
+      if (sig === lastMarqueeSelectionSigRef.current) return
+      lastMarqueeSelectionSigRef.current = sig
+      applyExactSelection(nextKeys)
+    }
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - marquee.startX) > 2 || Math.abs(e.clientY - marquee.startY) > 2) {
+        marqueeMovedRef.current = true
+      }
+      setMarquee((curr) => (curr ? { ...curr, currentX: e.clientX, currentY: e.clientY } : curr))
+      applyFromPoint(e.clientX, e.clientY)
+    }
+
+    const onMouseUp = (e: MouseEvent) => {
+      applyFromPoint(e.clientX, e.clientY)
+      if (marqueeMovedRef.current) {
+        suppressClickRef.current = true
+        if (suppressClickTimerRef.current) {
+          window.clearTimeout(suppressClickTimerRef.current)
+        }
+        suppressClickTimerRef.current = window.setTimeout(() => {
+          suppressClickRef.current = false
+          suppressClickTimerRef.current = null
+        }, 0)
+      }
+      setMarquee(null)
+      lastMarqueeSelectionSigRef.current = ''
+      marqueeMovedRef.current = false
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [marquee, visibleObjects, applyExactSelection])
+
+  useEffect(() => {
+    return () => {
+      if (suppressClickTimerRef.current) {
+        window.clearTimeout(suppressClickTimerRef.current)
+      }
+    }
+  }, [])
+
+  const marqueeStyle = useMemo<React.CSSProperties | null>(() => {
+    if (!marquee || !containerRef.current) return null
+    const rect = containerRef.current.getBoundingClientRect()
+    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+    const x1 = clamp(Math.min(marquee.startX, marquee.currentX) - rect.left, 0, rect.width)
+    const x2 = clamp(Math.max(marquee.startX, marquee.currentX) - rect.left, 0, rect.width)
+    const y1 = clamp(Math.min(marquee.startY, marquee.currentY) - rect.top, 0, rect.height)
+    const y2 = clamp(Math.max(marquee.startY, marquee.currentY) - rect.top, 0, rect.height)
+    return {
+      left: x1,
+      top: y1,
+      width: Math.max(1, x2 - x1),
+      height: Math.max(1, y2 - y1)
+    }
+  }, [marquee])
 
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return null
@@ -201,7 +322,7 @@ export function FileList({
       <ContextMenu.Trigger asChild>
         <div
           ref={containerRef}
-          className="flex-1 flex flex-col overflow-y-auto"
+          className="relative flex-1 flex flex-col overflow-y-auto"
           onScroll={(e) => {
             if (!isTruncated || loading || error) return
             const el = e.currentTarget
@@ -209,7 +330,32 @@ export function FileList({
             if (distanceToBottom < 160) void tryLoadMore()
           }}
           onClick={(e) => {
+            if (suppressClickRef.current) {
+              e.preventDefault()
+              return
+            }
             if (e.target === containerRef.current) clearSelection()
+          }}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return
+            const target = e.target as HTMLElement
+            const itemEl = target.closest('[data-file-item="true"]') as HTMLElement | null
+            if (itemEl) {
+              return
+            }
+            const append = e.ctrlKey || e.metaKey
+            initialMarqueeSelectionRef.current = append ? [...selectedKeys] : []
+            lastMarqueeSelectionSigRef.current = ''
+            marqueeMovedRef.current = false
+            if (!append) clearSelection()
+            setMarquee({
+              startX: e.clientX,
+              startY: e.clientY,
+              currentX: e.clientX,
+              currentY: e.clientY,
+              append
+            })
+            e.preventDefault()
           }}
         >
           {viewMode === 'list' && (
@@ -284,12 +430,17 @@ export function FileList({
                     <ContextMenu.Root key={obj.key}>
                       <ContextMenu.Trigger asChild>
                         <div
+                          ref={(el) => setItemRef(obj.key, el)}
+                          data-file-item="true"
+                          data-file-key={obj.key}
+                          draggable
                           className={cn(
                             'cursor-default select-none transition-colors duration-75',
                               viewMode === 'list'
                                 ? `px-4 py-1.5 border-b border-[var(--border)] border-opacity-50 ${LIST_GRID}`
                                 : 'rounded-lg border border-[var(--border)] px-2 py-1.5 min-h-[76px] flex flex-col gap-1.5',
                             isCut && 'opacity-50',
+                            obj.isFolder && dropTargetFolderKey === obj.key && 'ring-1 ring-[var(--accent)] bg-[var(--bg-hover)]',
                             isSelected ? 'bg-[var(--bg-selected)]' : 'hover:bg-[var(--bg-hover)]'
                           )}
                           onClick={(e) => handleRowClick(obj.key, e)}
@@ -297,6 +448,40 @@ export function FileList({
                             if (!selectedKeys.includes(obj.key)) selectKey(obj.key, false, false)
                           }}
                           onDoubleClick={() => handleRowDoubleClick(obj)}
+                          onDragStart={(e) => {
+                            const dragKeys = selectedKeys.includes(obj.key) ? [...selectedKeys] : [obj.key]
+                            e.dataTransfer.setData(dragMimeType, JSON.stringify(dragKeys))
+                            e.dataTransfer.setData('text/plain', dragKeys.join('\n'))
+                            e.dataTransfer.effectAllowed = 'move'
+                          }}
+                          onDragEnd={() => {
+                            setDropTargetFolderKey(null)
+                          }}
+                          onDragOver={(e) => {
+                            if (!obj.isFolder) return
+                            if (!e.dataTransfer.types.includes(dragMimeType)) return
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'move'
+                            if (dropTargetFolderKey !== obj.key) setDropTargetFolderKey(obj.key)
+                          }}
+                          onDragLeave={() => {
+                            if (dropTargetFolderKey === obj.key) setDropTargetFolderKey(null)
+                          }}
+                          onDrop={(e) => {
+                            if (!obj.isFolder) return
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setDropTargetFolderKey(null)
+                            const raw = e.dataTransfer.getData(dragMimeType)
+                            if (!raw) return
+                            try {
+                              const keys = JSON.parse(raw) as string[]
+                              if (!Array.isArray(keys) || keys.length === 0) return
+                              onMoveToFolder(keys, obj.key)
+                            } catch {
+                              // Ignore malformed payloads from unexpected drag sources.
+                            }
+                          }}
                         >
                           {viewMode === 'list' ? (
                             <>
@@ -408,7 +593,14 @@ export function FileList({
                 </div>
               )}
               <div ref={loadMoreSentinelRef} className="h-1 w-full" />
+
             </div>
+          )}
+          {marqueeStyle && (
+            <div
+              className="absolute z-30 pointer-events-none border border-[var(--accent)] bg-[var(--accent)]/15 rounded-sm"
+              style={marqueeStyle}
+            />
           )}
         </div>
       </ContextMenu.Trigger>
