@@ -6,6 +6,18 @@ import { getWindowState, saveWindowState } from './store'
 
 let mainWindow: BrowserWindow | null
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
+
+app.on('second-instance', () => {
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindow.isVisible()) mainWindow.show()
+  mainWindow.focus()
+})
+
 function resolveWindowIconPath(): string | undefined {
   const isWin = process.platform === 'win32'
   const iconFile = isWin ? 'icon.ico' : 'icon.png'

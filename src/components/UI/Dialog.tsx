@@ -28,6 +28,26 @@ export function Dialog({
   className,
   size = 'md'
 }: DialogProps) {
+  const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing) return
+    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return
+
+    const target = e.target as HTMLElement
+    if (target instanceof HTMLTextAreaElement) return
+
+    const content = e.currentTarget
+    const confirmBtn = content.querySelector<HTMLButtonElement>(
+      'button[data-dialog-confirm="true"]:not(:disabled)'
+    )
+    if (!confirmBtn) return
+
+    // If Enter is already on the confirm button itself, let the native click happen.
+    if (target === confirmBtn) return
+
+    e.preventDefault()
+    confirmBtn.click()
+  }
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -35,6 +55,7 @@ export function Dialog({
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 animate-fade-in"
         />
         <DialogPrimitive.Content
+          onKeyDown={handleKeyDown}
           className={cn(
             'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
             'bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl shadow-2xl',

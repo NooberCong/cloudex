@@ -10,6 +10,34 @@ export function TransferQueue() {
   const active = transfers.filter((t) => t.status === 'active' || t.status === 'queued')
   const done = transfers.filter((t) => t.status === 'done' || t.status === 'error')
   const total = transfers.length
+  const byId = new Map(transfers.map((t) => [t.id, t]))
+  const childrenByParent = new Map<string, TransferItem[]>()
+  const rootTransfers: TransferItem[] = []
+
+  // Resolve to a single parent row at most: descendants are flattened under nearest group ancestor.
+  const resolveOneLevelParent = (item: TransferItem): string | undefined => {
+    let currentParentId = item.parentTransferId
+    let guard = 0
+    while (currentParentId && guard < 20) {
+      const parent = byId.get(currentParentId)
+      if (!parent) return undefined
+      if (parent.isGroup) return parent.id
+      currentParentId = parent.parentTransferId
+      guard++
+    }
+    return undefined
+  }
+
+  for (const t of transfers) {
+    const oneLevelParentId = resolveOneLevelParent(t)
+    if (oneLevelParentId) {
+      const arr = childrenByParent.get(oneLevelParentId) ?? []
+      arr.push(t)
+      childrenByParent.set(oneLevelParentId, arr)
+      continue
+    }
+    rootTransfers.push(t)
+  }
 
   if (total === 0) return null
 
@@ -48,8 +76,13 @@ export function TransferQueue() {
 
       {isQueueOpen && (
         <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
-          {transfers.map((t) => (
-            <TransferItemRow key={t.id} item={t} onRemove={() => removeTransfer(t.id)} />
+          {rootTransfers.map((t) => (
+            <React.Fragment key={t.id}>
+              <TransferItemRow item={t} onRemove={() => removeTransfer(t.id)} />
+              {(childrenByParent.get(t.id) ?? []).map((child) => (
+                <TransferItemRow key={child.id} item={child} onRemove={() => removeTransfer(child.id)} isChild />
+              ))}
+            </React.Fragment>
           ))}
         </div>
       )}
@@ -57,13 +90,25 @@ export function TransferQueue() {
   )
 }
 
-function TransferItemRow({ item, onRemove }: { item: TransferItem; onRemove: () => void }) {
+function TransferItemRow({
+  item,
+  onRemove,
+  isChild
+}: {
+  item: TransferItem
+  onRemove: () => void
+  isChild?: boolean
+}) {
   const pct = item.totalBytes > 0
     ? Math.round((item.transferredBytes / item.totalBytes) * 100)
     : 0
+  const groupPct = item.totalItems && item.totalItems > 0
+    ? Math.round(((item.completedItems ?? item.transferredBytes) / item.totalItems) * 100)
+    : 0
+  const isGroup = !!item.isGroup
 
   return (
-    <div className="px-4 py-3.5 group">
+    <div className={cn('px-4 py-3.5 group', isChild && 'pl-8 bg-[var(--bg-secondary)]/40')}>
       <div className="flex items-start gap-2.5">
         <div className="mt-0.5 shrink-0">
           {item.direction === 'upload' ? (
@@ -92,24 +137,32 @@ function TransferItemRow({ item, onRemove }: { item: TransferItem; onRemove: () 
               <div className="mt-2 h-1.5 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
                 <div
                   className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
-                  style={{ width: `${pct}%` }}
+                  style={{ width: `${isGroup ? groupPct : pct}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between mt-1.5">
-                <span className="text-xs text-[var(--text-secondary)]">
-                  {formatBytes(item.transferredBytes)} / {formatBytes(item.totalBytes)} - {pct}%
-                </span>
-                <span className="text-xs text-[var(--text-secondary)]">
-                  {formatSpeed(item.speed)} {item.eta ? `- ${formatEta(item.eta)} left` : ''}
-                </span>
-              </div>
+              {isGroup ? (
+                <div className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                  {(item.completedItems ?? item.transferredBytes)} / {(item.totalItems ?? item.totalBytes)} items
+                </div>
+              ) : (
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-xs text-[var(--text-secondary)]">
+                    {formatBytes(item.transferredBytes)} / {formatBytes(item.totalBytes)} - {pct}%
+                  </span>
+                  <span className="text-xs text-[var(--text-secondary)]">
+                    {formatSpeed(item.speed)} {item.eta ? `- ${formatEta(item.eta)} left` : ''}
+                  </span>
+                </div>
+              )}
             </>
           )}
 
           {item.status === 'done' && (
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-[var(--success)]">
-                {item.direction === 'upload' ? 'Uploaded' : 'Downloaded'} - {formatBytes(item.totalBytes)}
+                {isGroup
+                  ? `Uploaded ${(item.completedItems ?? item.transferredBytes)} / ${(item.totalItems ?? item.totalBytes)} items`
+                  : `${item.direction === 'upload' ? 'Uploaded' : 'Downloaded'} - ${formatBytes(item.totalBytes)}`}
               </span>
               {item.direction === 'download' && (
                 <button

@@ -1,37 +1,23 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Pencil, Trash2, Plus, Cloud, HardDrive, Moon, Sun, Monitor } from 'lucide-react'
 import { Button } from '../UI/Button'
 import { useProvidersStore } from '../../store/providers'
-import { useToast } from '../UI/Toast'
 import type { ProviderConfig, Theme } from '../../types'
 
 interface SettingsPageProps {
   onClose: () => void
   onEditProvider: (p: ProviderConfig) => void
   onAddProvider: () => void
+  onDeleteProvider: (p: ProviderConfig) => void
+  deletingProviderId?: string | null
   theme: Theme
   onThemeChange: (t: Theme) => void
 }
 
 export function SettingsPage({
-  onClose, onEditProvider, onAddProvider, theme, onThemeChange
+  onClose, onEditProvider, onAddProvider, onDeleteProvider, deletingProviderId, theme, onThemeChange
 }: SettingsPageProps) {
-  const { providers, deleteProvider } = useProvidersStore()
-  const toast = useToast()
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Remove provider "${name}"?`)) return
-    setDeletingId(id)
-    try {
-      await deleteProvider(id)
-      toast.success('Provider removed')
-    } catch (e: any) {
-      toast.error('Failed to remove provider', e?.message)
-    } finally {
-      setDeletingId(null)
-    }
-  }
+  const { providers } = useProvidersStore()
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-primary)] animate-fade-in">
@@ -77,7 +63,9 @@ export function SettingsPage({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{p.name}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate" title={p.name}>
+                      {p.name}
+                    </p>
                     <p className="text-xs text-[var(--text-muted)]">
                       {p.type === 'aws-s3' ? 'AWS S3' : 'Cloudflare R2'} · {p.region}
                       {p.endpoint ? ` · ${new URL(p.endpoint).hostname}` : ''}
@@ -98,8 +86,8 @@ export function SettingsPage({
                       variant="ghost"
                       size="xs"
                       icon={<Trash2 className="w-3 h-3 text-[var(--danger)]" />}
-                      loading={deletingId === p.id}
-                      onClick={() => handleDelete(p.id, p.name)}
+                      loading={deletingProviderId === p.id}
+                      onClick={() => onDeleteProvider(p)}
                       title="Remove"
                     />
                   </div>

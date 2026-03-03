@@ -7,7 +7,8 @@ import { Button } from '../UI/Button'
 import { useExplorerStore } from '../../store/explorer'
 
 interface ToolbarProps {
-  onUpload: () => void
+  onUploadFiles: () => void
+  onUploadFolder: () => void
   onDownload: () => void
   onCopy: () => void
   onCut: () => void
@@ -17,7 +18,8 @@ interface ToolbarProps {
 }
 
 export function Toolbar({
-  onUpload,
+  onUploadFiles,
+  onUploadFolder,
   onDownload,
   onCopy,
   onCut,
@@ -108,12 +110,23 @@ export function Toolbar({
         variant="primary"
         size="sm"
         icon={<Upload className="w-3.5 h-3.5" />}
-        onClick={onUpload}
+        onClick={onUploadFiles}
         disabled={!location}
         className="no-drag"
-        title="Upload files (Ctrl+U)"
+        title="Upload files"
       >
-        Upload
+        Files
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={<Upload className="w-3.5 h-3.5" />}
+        onClick={onUploadFolder}
+        disabled={!location}
+        className="no-drag"
+        title="Upload folder"
+      >
+        Folder
       </Button>
 
       <Button

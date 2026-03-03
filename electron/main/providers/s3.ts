@@ -52,12 +52,27 @@ export class S3Provider extends StorageProvider {
   }
 
   async listBuckets(): Promise<BucketInfo[]> {
-    const cmd = new ListBucketsCommand({})
-    const res = await this.client.send(cmd)
-    return (res.Buckets ?? []).map((b) => ({
-      name: b.Name!,
-      createdAt: b.CreationDate
-    }))
+    const buckets = new Map<string, BucketInfo>()
+    let continuationToken: string | undefined = undefined
+
+    // Do not send MaxBuckets: some S3-compatible providers (including R2) reject it.
+    do {
+      const res = await this.client.send(
+        new ListBucketsCommand(
+          continuationToken ? { ContinuationToken: continuationToken } : {}
+        )
+      )
+      for (const b of res.Buckets ?? []) {
+        if (!b.Name) continue
+        buckets.set(b.Name, {
+          name: b.Name,
+          createdAt: b.CreationDate
+        })
+      }
+      continuationToken = res.ContinuationToken
+    } while (continuationToken)
+
+    return [...buckets.values()]
   }
 
   async listObjects(

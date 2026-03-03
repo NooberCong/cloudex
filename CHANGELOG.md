@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.0] - 2026-03-03
+
+### Added
+
+- Separate top-bar upload actions for `Files` and `Folder`
+- Folder upload transfer grouping with 1-level child file progress display
+- Single-instance app lock (second launch focuses existing window)
+- Long connection-name tooltip in sidebar when label is truncated
+
+### Changed
+
+- Region input suggestions UI refreshed to match app style, with capped height and scrolling
+- File-list marquee initiation behavior refined for the modified-column drag lane
+- Improved large-list selection performance during marquee drag
+
+### Fixed
+
+- Cloudflare R2 bucket listing fallback behavior for `ListBuckets` incompatibilities
+- Enter key confirmation for open dialogs (including delete confirmation)
+- Enter key opens selected file/folder when no dialog is focused
+- Rename conflict flow now prompts before overwriting existing items
+- New-folder conflict flow now prompts before merging/replacing
+- Region suggestion input no longer turns white after selecting a suggested value
+- Marquee rectangle positioning now stays aligned while scrolling
+
 ## [1.1.0] - 2026-03-03
 
 ### Added
@@ -73,3 +98,4 @@ First public release of CloudEx.
 
 [1.0.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.0.0
 [1.1.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.1.0
+[1.2.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.2.0

@@ -34,6 +34,37 @@ const EMPTY: ProviderFormState = {
   defaultBucket: ''
 }
 
+const S3_STANDARD_REGIONS = [
+  'us-east-1',
+  'us-east-2',
+  'us-west-1',
+  'us-west-2',
+  'ca-central-1',
+  'sa-east-1',
+  'eu-west-1',
+  'eu-west-2',
+  'eu-west-3',
+  'eu-central-1',
+  'eu-central-2',
+  'eu-north-1',
+  'eu-south-1',
+  'eu-south-2',
+  'me-south-1',
+  'me-central-1',
+  'af-south-1',
+  'ap-south-1',
+  'ap-south-2',
+  'ap-east-1',
+  'ap-southeast-1',
+  'ap-southeast-2',
+  'ap-southeast-3',
+  'ap-southeast-4',
+  'ap-northeast-1',
+  'ap-northeast-2',
+  'ap-northeast-3'
+]
+
+
 export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   const { saveProvider, testProvider } = useProvidersStore()
   const toast = useToast()
@@ -41,10 +72,12 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null)
+  const [regionMenuOpen, setRegionMenuOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
       setTestResult(null)
+      setRegionMenuOpen(false)
       if (editing) {
         setForm({
           name: editing.name,
@@ -124,6 +157,9 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   }
 
   const isR2 = form.type === 'cloudflare-r2'
+  const filteredRegions = S3_STANDARD_REGIONS.filter((region) =>
+    region.toLowerCase().includes(form.region.trim().toLowerCase())
+  )
 
   return (
     <Dialog
@@ -188,6 +224,59 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           />
         </Field>
 
+        {!isR2 && (
+          <Field
+            label="Region"
+            hint="Select a standard region or type a custom value"
+          >
+            <div className="relative">
+              <input
+                placeholder="us-east-1"
+                value={form.region}
+                onFocus={() => setRegionMenuOpen(true)}
+                onBlur={() => setTimeout(() => setRegionMenuOpen(false), 120)}
+                onChange={(e) => {
+                  update('region', e.target.value)
+                  setRegionMenuOpen(true)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setRegionMenuOpen(false)
+                }}
+                style={{ userSelect: 'auto' }}
+              />
+              {regionMenuOpen && (
+                <div className="absolute z-20 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg overflow-hidden">
+                  <div className="max-h-44 overflow-y-auto p-1">
+                    {filteredRegions.length > 0 ? (
+                      filteredRegions.map((region) => (
+                        <button
+                          key={region}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            update('region', region)
+                            setRegionMenuOpen(false)
+                          }}
+                          className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                            form.region === region
+                              ? 'bg-[var(--bg-selected)] text-[var(--accent)]'
+                              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          {region}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-xs text-[var(--text-muted)]">
+                        No matching regions
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Field>
+        )}
         {isR2 ? (
           <>
             <Field label="Account ID (Optional)" hint="Found in the Cloudflare dashboard">
@@ -209,14 +298,6 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           </>
         ) : (
           <>
-            <Field label="Region">
-              <input
-                placeholder="us-east-1"
-                value={form.region}
-                onChange={(e) => update('region', e.target.value)}
-                style={{ userSelect: 'auto' }}
-              />
-            </Field>
             <Field label="Custom Endpoint" hint="Optional – for S3-compatible services or VPCs">
               <input
                 placeholder="https://s3.example.com"
@@ -265,7 +346,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSave} loading={saving}>
+            <Button variant="primary" size="sm" onClick={handleSave} loading={saving} data-dialog-confirm="true">
               {editing ? 'Save Changes' : 'Add Provider'}
             </Button>
           </div>
@@ -297,3 +378,4 @@ function Field({
     </div>
   )
 }
+

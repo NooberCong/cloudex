@@ -18,11 +18,15 @@ It is built with Electron, React, TypeScript, Zustand, and the AWS SDK v3.
 - Upload and download with transfer progress
 - Drag and drop file upload
 - Drag items onto folders to move them
-- Folder upload support
+- Separate file/folder upload actions
+- Folder upload support with grouped parent/child progress
 - Copy, cut, paste, rename, delete, and create folder
 - Multi-select operations and bulk download (zip)
 - Windows-style click-drag rectangle multi-select
+- Improved marquee performance for large item lists
 - Clipboard panel with expandable item list and in-progress operation indicator
+- Enter key support for dialog confirm and opening selected item
+- Single-instance app behavior
 - Presigned URL generation with configurable expiration
 - Context menus and keyboard shortcuts
 - Light/dark theme support
@@ -86,6 +90,7 @@ npm run dev
 - `Delete` or `Backspace`: Delete selected items
 - `Ctrl/Cmd + D`: Delete selected items
 - `F5` or `Ctrl/Cmd + R`: Refresh current folder
+- `Enter`: Open selected file/folder (or confirm focused dialog action)
 - `Escape`: Clear current selection
 - `Shift + Click`: Select range
 - `Ctrl/Cmd + Click`: Toggle item selection

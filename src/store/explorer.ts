@@ -38,6 +38,7 @@ interface ExplorerState {
   setViewMode: (mode: ViewMode) => void
   setSort: (field: SortField, dir?: SortDir) => void
   selectKey: (key: string, multi?: boolean, range?: boolean) => void
+  setSelection: (keys: string[]) => void
   selectAll: () => void
   clearSelection: () => void
   setClipboard: (action: 'copy' | 'move', keys: string[]) => void
@@ -279,12 +280,27 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     }
   },
 
+  setSelection: (keys) => {
+    const { selectedKeys } = get()
+    if (
+      selectedKeys.length === keys.length &&
+      selectedKeys.every((k, idx) => k === keys[idx])
+    ) {
+      return
+    }
+    set({ selectedKeys: keys })
+  },
+
   selectAll: () => {
     const { objects } = get()
     set({ selectedKeys: objects.map((o) => o.key) })
   },
 
-  clearSelection: () => set({ selectedKeys: [] }),
+  clearSelection: () => {
+    const { selectedKeys } = get()
+    if (selectedKeys.length === 0) return
+    set({ selectedKeys: [] })
+  },
 
   setClipboard: (action, keys) => {
     const { location } = get()

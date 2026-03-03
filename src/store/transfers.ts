@@ -43,6 +43,19 @@ export const useTransfersStore = create<TransfersState>((set) => ({
       transfers: s.transfers.map((t) => {
         if (t.id !== transferId) return t
 
+        if (t.isGroup) {
+          return {
+            ...t,
+            transferredBytes,
+            totalBytes,
+            completedItems: transferredBytes,
+            totalItems: totalBytes,
+            status: 'active',
+            speed: undefined,
+            eta: undefined
+          }
+        }
+
         const elapsed = (Date.now() - (t.startedAt ?? Date.now())) / 1000
         const speed = elapsed > 0 ? transferredBytes / elapsed : 0
         const remaining = totalBytes - transferredBytes
@@ -64,7 +77,14 @@ export const useTransfersStore = create<TransfersState>((set) => ({
     set((s) => ({
       transfers: s.transfers.map((t) =>
         t.id === transferId
-          ? { ...t, status: 'done', transferredBytes: t.totalBytes, completedAt: Date.now() }
+          ? {
+            ...t,
+            status: 'done',
+            transferredBytes: t.totalBytes,
+            completedItems: t.isGroup ? t.totalBytes : t.completedItems,
+            totalItems: t.isGroup ? t.totalBytes : t.totalItems,
+            completedAt: Date.now()
+          }
           : t
       )
     }))

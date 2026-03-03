@@ -49,7 +49,7 @@ export function DeleteDialog({ open, onOpenChange, keys, onConfirm }: DeleteDial
         )}
         <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="danger" size="sm" loading={loading} onClick={handleConfirm}>
+          <Button variant="danger" size="sm" loading={loading} onClick={handleConfirm} data-dialog-confirm="true">
             Delete {keys.length > 1 ? `${keys.length} items` : ''}
           </Button>
         </div>
@@ -114,7 +114,7 @@ export function RenameDialog({ open, onOpenChange, object, onConfirm }: RenameDi
         />
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="primary" size="sm" loading={loading} onClick={handleConfirm}>
+          <Button variant="primary" size="sm" loading={loading} onClick={handleConfirm} data-dialog-confirm="true">
             Rename
           </Button>
         </div>
@@ -171,7 +171,7 @@ export function NewFolderDialog({ open, onOpenChange, onConfirm }: NewFolderDial
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="primary" size="sm" loading={loading} onClick={handleConfirm}
+          <Button variant="primary" size="sm" loading={loading} onClick={handleConfirm} data-dialog-confirm="true"
             disabled={!name.trim()}>
             Create Folder
           </Button>
@@ -212,7 +212,106 @@ export function UploadConflictDialog({
         <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
           <Button variant="outline" size="sm" onClick={onCancelUpload}>Cancel Upload</Button>
           <Button variant="ghost" size="sm" onClick={onSkip}>Skip</Button>
-          <Button variant="primary" size="sm" onClick={onOverwrite}>Overwrite</Button>
+          <Button variant="primary" size="sm" onClick={onOverwrite} data-dialog-confirm="true">Overwrite</Button>
+        </div>
+      </div>
+    </Dialog>
+  )
+}
+
+interface RenameConflictDialogProps {
+  open: boolean
+  path: string
+  onReplace: () => Promise<void>
+  onCancel: () => void
+  title?: string
+  confirmLabel?: string
+}
+
+export function RenameConflictDialog({
+  open,
+  path,
+  onReplace,
+  onCancel,
+  title = 'Name Already Exists',
+  confirmLabel = 'Replace'
+}: RenameConflictDialogProps) {
+  const [loading, setLoading] = useState(false)
+
+  const handleReplace = async () => {
+    setLoading(true)
+    try {
+      await onReplace()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => { if (!v) onCancel() }}
+      title={title}
+      size="sm"
+    >
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--warning)]/10">
+          <AlertTriangle className="w-4 h-4 text-[var(--warning)] shrink-0 mt-0.5" />
+          <div className="text-sm text-[var(--text-primary)] min-w-0">
+            <p className="mb-1">An item with this name already exists:</p>
+            <p className="text-xs text-[var(--text-secondary)] font-mono break-all">{path}</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={loading}>Cancel</Button>
+          <Button variant="danger" size="sm" onClick={handleReplace} loading={loading} data-dialog-confirm="true">
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  )
+}
+
+interface ProviderDeleteDialogProps {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  providerName: string
+  onConfirm: () => Promise<void>
+}
+
+export function ProviderDeleteDialog({
+  open,
+  onOpenChange,
+  providerName,
+  onConfirm
+}: ProviderDeleteDialogProps) {
+  const [loading, setLoading] = useState(false)
+
+  const handleConfirm = async () => {
+    setLoading(true)
+    try {
+      await onConfirm()
+      onOpenChange(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} title="Delete Provider" size="sm">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--danger-light)]">
+          <Trash2 className="w-4 h-4 text-[var(--danger)] shrink-0 mt-0.5" />
+          <p className="text-sm text-[var(--text-primary)]">
+            Remove provider <strong>{providerName}</strong>? You will lose saved credentials for this connection.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="danger" size="sm" loading={loading} onClick={handleConfirm} data-dialog-confirm="true">
+            Delete Provider
+          </Button>
         </div>
       </div>
     </Dialog>

@@ -7,7 +7,8 @@ import { TransferQueue } from './components/Transfer/TransferQueue'
 import { AddProviderDialog } from './components/Dialogs/AddProviderDialog'
 import {
   DeleteDialog, RenameDialog, NewFolderDialog,
-  PresignedUrlDialog, PropertiesDialog, UploadConflictDialog
+  PresignedUrlDialog, PropertiesDialog, UploadConflictDialog, ProviderDeleteDialog,
+  RenameConflictDialog
 } from './components/Dialogs/OperationDialogs'
 import { SettingsPage } from './components/Settings/SettingsPage'
 import { useExplorerStore } from './store/explorer'
@@ -60,6 +61,43 @@ export function App() {
     window.api.prefs.save({ theme: t }).catch(() => {})
   }
 
+  const folderUploadGroupsRef = useRef(new Map<string, {
+    childIds: Set<string>
+    completedIds: Set<string>
+    hasError: boolean
+  }>())
+  const childToFolderGroupRef = useRef(new Map<string, string>())
+
+  const refreshFolderGroupProgress = useCallback((groupId: string) => {
+    const group = folderUploadGroupsRef.current.get(groupId)
+    if (!group) return
+    updateProgress(groupId, group.completedIds.size, group.childIds.size)
+  }, [updateProgress])
+
+  const markFolderGroupChildFinished = useCallback((childTransferId: string, errorMessage?: string) => {
+    const groupId = childToFolderGroupRef.current.get(childTransferId)
+    if (!groupId) return
+    const group = folderUploadGroupsRef.current.get(groupId)
+    if (!group) return
+
+    if (group.completedIds.has(childTransferId)) return
+    if (errorMessage) group.hasError = true
+    group.completedIds.add(childTransferId)
+    refreshFolderGroupProgress(groupId)
+
+    if (group.completedIds.size >= group.childIds.size) {
+      if (group.hasError) {
+        errorTransfer(groupId, 'Some files in this folder failed')
+      } else {
+        completeTransfer(groupId)
+      }
+      for (const childId of group.childIds) {
+        childToFolderGroupRef.current.delete(childId)
+      }
+      folderUploadGroupsRef.current.delete(groupId)
+    }
+  }, [completeTransfer, errorTransfer, refreshFolderGroupProgress])
+
   // ── Transfer IPC listeners ───────────────────────────────────────────────────
   useEffect(() => {
     const unsubProgress = window.api.transfer.onProgress(({ transferId, transferredBytes, totalBytes }) => {
@@ -67,21 +105,26 @@ export function App() {
     })
     const unsubComplete = window.api.transfer.onComplete(({ transferId }) => {
       completeTransfer(transferId)
+      markFolderGroupChildFinished(transferId)
       refresh()
     })
     const unsubError = window.api.transfer.onError(({ transferId, error }) => {
       errorTransfer(transferId, error)
+      markFolderGroupChildFinished(transferId, error)
     })
     return () => {
       unsubProgress()
       unsubComplete()
       unsubError()
     }
-  }, [updateProgress, completeTransfer, refresh, errorTransfer])
+  }, [updateProgress, completeTransfer, refresh, errorTransfer, refreshFolderGroupProgress, markFolderGroupChildFinished])
 
   // ── Add provider dialog ──────────────────────────────────────────────────────
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [editingProvider, setEditingProvider] = useState<ProviderConfig | null>(null)
+  const [providerDeleteOpen, setProviderDeleteOpen] = useState(false)
+  const [providerDeleteTarget, setProviderDeleteTarget] = useState<ProviderConfig | null>(null)
+  const [deletingProviderId, setDeletingProviderId] = useState<string | null>(null)
 
   const openAddProvider = () => {
     setEditingProvider(null)
@@ -92,13 +135,21 @@ export function App() {
     setAddProviderOpen(true)
   }
 
-  const handleDeleteProvider = async (provider: ProviderConfig) => {
-    if (!confirm(`Remove provider "${provider.name}"?`)) return
+  const handleDeleteProviderRequest = (provider: ProviderConfig) => {
+    setProviderDeleteTarget(provider)
+    setProviderDeleteOpen(true)
+  }
+
+  const handleDeleteProviderConfirm = async () => {
+    if (!providerDeleteTarget) return
+    setDeletingProviderId(providerDeleteTarget.id)
     try {
-      await deleteProvider(provider.id)
+      await deleteProvider(providerDeleteTarget.id)
       toast.success('Provider removed')
     } catch (e: any) {
       toast.error('Failed to remove provider', e?.message)
+    } finally {
+      setDeletingProviderId(null)
     }
   }
 
@@ -126,6 +177,25 @@ export function App() {
   // ── Rename dialog ────────────────────────────────────────────────────────────
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<S3Object | null>(null)
+  const [renameConflict, setRenameConflict] = useState<{
+    target: S3Object
+    destKey: string
+  } | null>(null)
+
+  const executeRename = useCallback(async (target: S3Object, destKey: string) => {
+    if (!location) return
+    await window.api.objects.rename(
+      location.providerId,
+      location.bucket,
+      target.key,
+      destKey
+    )
+    if (target.isFolder) {
+      pruneHistoryPaths(location.providerId, location.bucket, [target.key])
+    }
+    toast.success('Renamed successfully')
+    refresh()
+  }, [location, pruneHistoryPaths, refresh, toast])
 
   const handleRenameConfirm = async (newName: string) => {
     if (!location || !renameTarget) return
@@ -140,25 +210,50 @@ export function App() {
     const parts = sourceKey.split('/')
     parts[parts.length - 1] = newName
     const newKey = renameTarget.isFolder ? `${parts.join('/')}/` : parts.join('/')
-    await window.api.objects.rename(
-      location.providerId,
-      location.bucket,
-      renameTarget.key,
-      newKey
-    )
+
+    let destinationExists = false
     if (renameTarget.isFolder) {
-      pruneHistoryPaths(location.providerId, location.bucket, [renameTarget.key])
+      try {
+        await window.api.objects.metadata(location.providerId, location.bucket, newKey)
+        destinationExists = true
+      } catch {
+        const listed = await window.api.objects.list(location.providerId, location.bucket, newKey)
+        destinationExists = listed.objects.length > 0 || listed.prefixes.length > 0
+      }
+    } else {
+      destinationExists = await objectExists(location.providerId, location.bucket, newKey)
     }
-    toast.success('Renamed successfully')
-    refresh()
+
+    if (destinationExists) {
+      setRenameConflict({ target: renameTarget, destKey: newKey })
+      return
+    }
+
+    await executeRename(renameTarget, newKey)
   }
 
   // ── New folder dialog ────────────────────────────────────────────────────────
   const [newFolderOpen, setNewFolderOpen] = useState(false)
+  const [newFolderConflictPath, setNewFolderConflictPath] = useState<string | null>(null)
 
   const handleNewFolderConfirm = async (name: string) => {
     if (!location) return
     const prefix = location.prefix + name
+    const fileExists = await objectExists(location.providerId, location.bucket, prefix)
+    const folderKey = `${prefix}/`
+    let folderExists = false
+    try {
+      await window.api.objects.metadata(location.providerId, location.bucket, folderKey)
+      folderExists = true
+    } catch {
+      const listed = await window.api.objects.list(location.providerId, location.bucket, folderKey)
+      folderExists = listed.objects.length > 0 || listed.prefixes.length > 0
+    }
+
+    if (fileExists || folderExists) {
+      setNewFolderConflictPath(folderKey)
+      return
+    }
     await window.api.objects.createFolder(location.providerId, location.bucket, prefix)
     toast.success(`Folder "${name}" created`)
     refresh()
@@ -215,6 +310,38 @@ export function App() {
 
     let skippedConflicts = 0
     let canceledByUser = false
+    const folderGroupByRoot = new Map<string, string>()
+
+    const ensureFolderGroupTransfer = (relativePath: string): string | undefined => {
+      const parts = relativePath.split('/').filter(Boolean)
+      if (parts.length <= 1) return undefined
+      const rootFolder = parts[0]
+      const existingGroupId = folderGroupByRoot.get(rootFolder)
+      if (existingGroupId) return existingGroupId
+
+      const groupId = generateId()
+      folderGroupByRoot.set(rootFolder, groupId)
+      folderUploadGroupsRef.current.set(groupId, {
+        childIds: new Set<string>(),
+        completedIds: new Set<string>(),
+        hasError: false
+      })
+      addTransfer({
+        id: groupId,
+        direction: 'upload',
+        isGroup: true,
+        providerId: location.providerId,
+        bucket: location.bucket,
+        key: location.prefix + `${rootFolder}/`,
+        localPath: rootFolder,
+        fileName: `${rootFolder}/`,
+        completedItems: 0,
+        totalItems: 0,
+        totalBytes: 0
+      })
+      return groupId
+    }
+
     for (const entry of uploadEntries) {
       const filePath = entry.filePath
       const relativePath = entry.relativePath.replace(/\\/g, '/')
@@ -237,10 +364,21 @@ export function App() {
       }
 
       const transferId = generateId()
+      const groupId = ensureFolderGroupTransfer(relativePath)
+
+      if (groupId) {
+        const group = folderUploadGroupsRef.current.get(groupId)
+        if (group) {
+          group.childIds.add(transferId)
+          childToFolderGroupRef.current.set(transferId, groupId)
+          refreshFolderGroupProgress(groupId)
+        }
+      }
 
       addTransfer({
         id: transferId,
         direction: 'upload',
+        parentTransferId: groupId,
         providerId: location.providerId,
         bucket: location.bucket,
         key,
@@ -256,7 +394,9 @@ export function App() {
         filePath,
         transferId
       }).catch((e) => {
-        errorTransfer(transferId, e?.message || String(e))
+        const message = e?.message || String(e)
+        errorTransfer(transferId, message)
+        markFolderGroupChildFinished(transferId, message)
         toast.error(`Upload failed: ${fileName}`, e?.message)
       })
     }
@@ -267,12 +407,19 @@ export function App() {
     if (canceledByUser) {
       toast.info('Upload canceled')
     }
-  }, [location, addTransfer, errorTransfer, toast, requestUploadConflict])
+  }, [location, addTransfer, errorTransfer, toast, requestUploadConflict, markFolderGroupChildFinished])
 
   // ── Upload ───────────────────────────────────────────────────────────────────
-  const handleUpload = useCallback(async () => {
+  const handleUploadFiles = useCallback(async () => {
     if (!location) return
     const result = await window.api.dialog.openFile()
+    if (result.canceled || result.filePaths.length === 0) return
+    void uploadFromPaths(result.filePaths)
+  }, [location, uploadFromPaths])
+
+  const handleUploadFolder = useCallback(async () => {
+    if (!location) return
+    const result = await window.api.dialog.openDirectory({ title: 'Select folder to upload' })
     if (result.canceled || result.filePaths.length === 0) return
     void uploadFromPaths(result.filePaths)
   }, [location, uploadFromPaths])
@@ -630,7 +777,7 @@ export function App() {
         onOpenSettings={() => setView('settings')}
         onOpenExplorer={() => setView('explorer')}
         onEditProvider={openEditProvider}
-        onDeleteProvider={handleDeleteProvider}
+        onDeleteProvider={handleDeleteProviderRequest}
       />
 
       {/* Main content */}
@@ -640,13 +787,16 @@ export function App() {
             onClose={() => setView('explorer')}
             onEditProvider={openEditProvider}
             onAddProvider={openAddProvider}
+            onDeleteProvider={handleDeleteProviderRequest}
+            deletingProviderId={deletingProviderId}
             theme={theme}
             onThemeChange={handleThemeChange}
           />
         ) : (
           <>
             <Toolbar
-              onUpload={handleUpload}
+              onUploadFiles={handleUploadFiles}
+              onUploadFolder={handleUploadFolder}
               onDownload={() => handleDownload()}
               onCopy={handleCopy}
               onCut={handleCut}
@@ -782,6 +932,35 @@ export function App() {
         onOverwrite={() => resolveUploadConflict('overwrite')}
         onSkip={() => resolveUploadConflict('skip')}
         onCancelUpload={() => resolveUploadConflict('cancel')}
+      />
+      <ProviderDeleteDialog
+        open={providerDeleteOpen}
+        onOpenChange={(open) => {
+          setProviderDeleteOpen(open)
+          if (!open) setProviderDeleteTarget(null)
+        }}
+        providerName={providerDeleteTarget?.name || ''}
+        onConfirm={handleDeleteProviderConfirm}
+      />
+      <RenameConflictDialog
+        open={!!renameConflict}
+        path={renameConflict?.destKey || ''}
+        onCancel={() => setRenameConflict(null)}
+        onReplace={async () => {
+          if (!renameConflict) return
+          await executeRename(renameConflict.target, renameConflict.destKey)
+          setRenameConflict(null)
+        }}
+      />
+      <RenameConflictDialog
+        open={!!newFolderConflictPath}
+        title="Name Already Exists"
+        confirmLabel="OK"
+        path={newFolderConflictPath || ''}
+        onCancel={() => setNewFolderConflictPath(null)}
+        onReplace={async () => {
+          setNewFolderConflictPath(null)
+        }}
       />
     </div>
   )

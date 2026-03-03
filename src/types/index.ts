@@ -59,6 +59,10 @@ export interface TransferItem {
   id: string
   direction: TransferDirection
   status: TransferStatus
+  /** Optional parent transfer id for hierarchical display (e.g. files under folder upload). */
+  parentTransferId?: string
+  /** True for virtual aggregate transfers (e.g. folder upload parent row). */
+  isGroup?: boolean
   providerId: string
   bucket: string
   key: string
@@ -66,6 +70,9 @@ export interface TransferItem {
   localPath: string
   /** File name for display */
   fileName: string
+  /** Aggregate item progress (used by group rows). */
+  completedItems?: number
+  totalItems?: number
   totalBytes: number
   transferredBytes: number
   /** Bytes per second */

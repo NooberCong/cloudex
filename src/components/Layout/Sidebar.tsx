@@ -140,7 +140,9 @@ export function Sidebar({
                   )}
                 </span>
                 {providerIcon(provider.type)}
-                <span className="flex-1 text-xs font-medium truncate">{provider.name}</span>
+                <span className="flex-1 text-xs font-medium truncate" title={provider.name}>
+                  {provider.name}
+                </span>
                 <span className="text-[10px] text-[var(--text-muted)] shrink-0">
                   {providerLabel(provider.type)}
                 </span>

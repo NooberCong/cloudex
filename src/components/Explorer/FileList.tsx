@@ -40,7 +40,7 @@ export function FileList({
   const {
     loading, error, location, selectedKeys,
     sortField, sortDir, isTruncated, objects, viewMode,
-    navigate, refresh, loadMore, selectKey, selectAll, clearSelection,
+    navigate, refresh, loadMore, selectKey, setSelection, selectAll, clearSelection,
     setSort, setClipboard, clipboard
   } = useExplorerStore()
 
@@ -69,6 +69,7 @@ export function FileList({
     }
     return new Set(clipboard.keys)
   }, [location, clipboard])
+  const selectedKeySet = useMemo(() => new Set(selectedKeys), [selectedKeys])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
@@ -79,6 +80,9 @@ export function FileList({
   const initialMarqueeSelectionRef = useRef<string[]>([])
   const lastMarqueeSelectionSigRef = useRef<string>('')
   const marqueeMovedRef = useRef(false)
+  const marqueeRectsRef = useRef<Map<string, DOMRect>>(new Map())
+  const marqueeCurrentPointRef = useRef<{ x: number; y: number } | null>(null)
+  const marqueeRafRef = useRef<number | null>(null)
   const suppressClickRef = useRef(false)
   const suppressClickTimerRef = useRef<number | null>(null)
   const [marquee, setMarquee] = useState<{
@@ -130,10 +134,28 @@ export function FileList({
         target?.tagName === 'INPUT' ||
         target?.tagName === 'TEXTAREA' ||
         target?.isContentEditable
+      const inDialog = !!target?.closest('[role="dialog"]')
 
       if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
         selectAll()
+      } else if (e.key === 'Enter' && !isTyping && !inDialog) {
+        if (selectedKeys.length === 0) return
+        const selectedObject = visibleObjects.find((obj) => selectedKeys.includes(obj.key))
+        if (!selectedObject || openingKey) return
+        e.preventDefault()
+
+        if (selectedObject.isFolder) {
+          navigate({ ...location, prefix: selectedObject.key })
+          return
+        }
+
+        setOpeningKey(selectedObject.key)
+        window.api.objects.open(location.providerId, location.bucket, selectedObject.key)
+          .catch((err: any) => {
+            toast.error(`Failed to open ${selectedObject.name}`, err?.message || String(err))
+          })
+          .finally(() => setOpeningKey(null))
       } else if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey) && !isTyping) {
         if (selectedKeys.length > 0) {
           e.preventDefault()
@@ -168,7 +190,7 @@ export function FileList({
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [location, selectedKeys, clipboard, onPaste, onDelete, refresh, clearSelection, selectAll, setClipboard])
+  }, [location, selectedKeys, clipboard, onPaste, onDelete, refresh, clearSelection, selectAll, setClipboard, visibleObjects, openingKey, navigate, toast])
 
   const handleRowClick = useCallback((key: string, e: React.MouseEvent) => {
     if (suppressClickRef.current) {
@@ -204,9 +226,8 @@ export function FileList({
   }, [])
 
   const applyExactSelection = useCallback((keys: string[]) => {
-    clearSelection()
-    keys.forEach((key, idx) => selectKey(key, idx > 0, false))
-  }, [clearSelection, selectKey])
+    setSelection(keys)
+  }, [setSelection])
 
   const rectsIntersect = (a: { left: number; right: number; top: number; bottom: number }, b: DOMRect) => {
     return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom)
@@ -225,9 +246,9 @@ export function FileList({
 
       const intersected: string[] = []
       for (const obj of visibleObjects) {
-        const el = itemRefs.current.get(obj.key)
-        if (!el) continue
-        if (rectsIntersect(selectionRect, el.getBoundingClientRect())) {
+        const rect = marqueeRectsRef.current.get(obj.key)
+        if (!rect) continue
+        if (rectsIntersect(selectionRect, rect)) {
           intersected.push(obj.key)
         }
       }
@@ -241,15 +262,40 @@ export function FileList({
       applyExactSelection(nextKeys)
     }
 
+    marqueeRectsRef.current = new Map(
+      visibleObjects
+        .map((obj) => {
+          const el = itemRefs.current.get(obj.key)
+          if (!el) return null
+          return [obj.key, el.getBoundingClientRect()] as const
+        })
+        .filter((entry): entry is readonly [string, DOMRect] => !!entry)
+    )
+
+    const scheduleApply = () => {
+      if (marqueeRafRef.current !== null) return
+      marqueeRafRef.current = window.requestAnimationFrame(() => {
+        marqueeRafRef.current = null
+        const point = marqueeCurrentPointRef.current
+        if (!point) return
+        applyFromPoint(point.x, point.y)
+      })
+    }
+
     const onMouseMove = (e: MouseEvent) => {
       if (Math.abs(e.clientX - marquee.startX) > 2 || Math.abs(e.clientY - marquee.startY) > 2) {
         marqueeMovedRef.current = true
       }
       setMarquee((curr) => (curr ? { ...curr, currentX: e.clientX, currentY: e.clientY } : curr))
-      applyFromPoint(e.clientX, e.clientY)
+      marqueeCurrentPointRef.current = { x: e.clientX, y: e.clientY }
+      scheduleApply()
     }
 
     const onMouseUp = (e: MouseEvent) => {
+      if (marqueeRafRef.current !== null) {
+        window.cancelAnimationFrame(marqueeRafRef.current)
+        marqueeRafRef.current = null
+      }
       applyFromPoint(e.clientX, e.clientY)
       if (marqueeMovedRef.current) {
         suppressClickRef.current = true
@@ -264,11 +310,19 @@ export function FileList({
       setMarquee(null)
       lastMarqueeSelectionSigRef.current = ''
       marqueeMovedRef.current = false
+      marqueeCurrentPointRef.current = null
+      marqueeRectsRef.current.clear()
     }
 
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
     return () => {
+      if (marqueeRafRef.current !== null) {
+        window.cancelAnimationFrame(marqueeRafRef.current)
+        marqueeRafRef.current = null
+      }
+      marqueeCurrentPointRef.current = null
+      marqueeRectsRef.current.clear()
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
@@ -284,12 +338,13 @@ export function FileList({
 
   const marqueeStyle = useMemo<React.CSSProperties | null>(() => {
     if (!marquee || !containerRef.current) return null
-    const rect = containerRef.current.getBoundingClientRect()
+    const container = containerRef.current
+    const rect = container.getBoundingClientRect()
     const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
-    const x1 = clamp(Math.min(marquee.startX, marquee.currentX) - rect.left, 0, rect.width)
-    const x2 = clamp(Math.max(marquee.startX, marquee.currentX) - rect.left, 0, rect.width)
-    const y1 = clamp(Math.min(marquee.startY, marquee.currentY) - rect.top, 0, rect.height)
-    const y2 = clamp(Math.max(marquee.startY, marquee.currentY) - rect.top, 0, rect.height)
+    const x1 = clamp(Math.min(marquee.startX, marquee.currentX) - rect.left + container.scrollLeft, 0, container.scrollWidth)
+    const x2 = clamp(Math.max(marquee.startX, marquee.currentX) - rect.left + container.scrollLeft, 0, container.scrollWidth)
+    const y1 = clamp(Math.min(marquee.startY, marquee.currentY) - rect.top + container.scrollTop, 0, container.scrollHeight)
+    const y2 = clamp(Math.max(marquee.startY, marquee.currentY) - rect.top + container.scrollTop, 0, container.scrollHeight)
     return {
       left: x1,
       top: y1,
@@ -340,8 +395,13 @@ export function FileList({
             if (e.button !== 0) return
             const target = e.target as HTMLElement
             const itemEl = target.closest('[data-file-item="true"]') as HTMLElement | null
+            const marqueeLaneEl = target.closest('[data-marquee-lane="true"]') as HTMLElement | null
             if (itemEl) {
-              return
+              if (marqueeLaneEl) {
+                e.preventDefault()
+              } else {
+                return
+              }
             }
             const append = e.ctrlKey || e.metaKey
             initialMarqueeSelectionRef.current = append ? [...selectedKeys] : []
@@ -422,7 +482,7 @@ export function FileList({
 
               <div className={cn(viewMode === 'grid' && 'grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5')}>
                 {visibleObjects.map((obj) => {
-                  const isSelected = selectedKeys.includes(obj.key)
+                  const isSelected = selectedKeySet.has(obj.key)
                   const isOpening = openingKey === obj.key
                   const isCut = cutKeys.has(obj.key)
 
@@ -445,11 +505,11 @@ export function FileList({
                           )}
                           onClick={(e) => handleRowClick(obj.key, e)}
                           onContextMenu={() => {
-                            if (!selectedKeys.includes(obj.key)) selectKey(obj.key, false, false)
+                            if (!selectedKeySet.has(obj.key)) selectKey(obj.key, false, false)
                           }}
                           onDoubleClick={() => handleRowDoubleClick(obj)}
                           onDragStart={(e) => {
-                            const dragKeys = selectedKeys.includes(obj.key) ? [...selectedKeys] : [obj.key]
+                            const dragKeys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
                             e.dataTransfer.setData(dragMimeType, JSON.stringify(dragKeys))
                             e.dataTransfer.setData('text/plain', dragKeys.join('\n'))
                             e.dataTransfer.effectAllowed = 'move'
@@ -496,7 +556,11 @@ export function FileList({
                               <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
                                 {obj.isFolder ? '-' : formatBytes(obj.size)}
                               </div>
-                              <div className="text-xs text-[var(--text-muted)] tabular-nums truncate">
+                              <div
+                                data-marquee-lane="true"
+                                className="text-xs text-[var(--text-muted)] tabular-nums truncate"
+                                title="Drag from here to multi-select"
+                              >
                                 {obj.isFolder ? '-' : formatDate(obj.lastModified)}
                               </div>
                             </>
@@ -538,7 +602,7 @@ export function FileList({
                             icon={<Copy className="w-3.5 h-3.5" />}
                             label="Copy"
                             onClick={() => {
-                              const keys = selectedKeys.includes(obj.key) ? [...selectedKeys] : [obj.key]
+                              const keys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
                               setClipboard('copy', keys)
                             }}
                           />
@@ -546,7 +610,7 @@ export function FileList({
                             icon={<Scissors className="w-3.5 h-3.5" />}
                             label="Cut"
                             onClick={() => {
-                              const keys = selectedKeys.includes(obj.key) ? [...selectedKeys] : [obj.key]
+                              const keys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
                               setClipboard('move', keys)
                             }}
                           />
@@ -570,12 +634,12 @@ export function FileList({
                           <ContextMenu.Separator className="my-1 border-t border-[var(--border)]" />
                           <ContextMenuItem
                             icon={<Trash2 className="w-3.5 h-3.5" />}
-                            label={selectedKeys.length > 1 && selectedKeys.includes(obj.key)
+                            label={selectedKeys.length > 1 && selectedKeySet.has(obj.key)
                               ? `Delete ${selectedKeys.length} items`
                               : 'Delete'}
                             danger
                             onClick={() => {
-                              const keys = selectedKeys.includes(obj.key) ? [...selectedKeys] : [obj.key]
+                              const keys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
                               onDelete(keys)
                             }}
                           />
