@@ -18,6 +18,7 @@ const ICON_EXTENSIONS = ['svg', 'png', 'webp', 'jpg', 'jpeg', 'gif'] as const
 const ICON_BASENAME_OVERRIDES: Partial<Record<ProviderType, string[]>> = {
   'google-cloud-storage': ['google-cloud', 'google-cloud-storage']
 }
+const PROVIDER_ICON_BASE = `${import.meta.env.BASE_URL}provider-icons/`
 
 const fallbackIcon = (type: ProviderType, className: string) => {
   if (type === 'aws-s3') return <Cloud className={cn(className, 'text-[#FF9900]')} />
@@ -42,7 +43,7 @@ interface ProviderIconProps {
 export function ProviderIcon({ type, className = 'w-4 h-4' }: ProviderIconProps) {
   const sources = useMemo(() => {
     const basenames = ICON_BASENAME_OVERRIDES[type] ?? [type]
-    return basenames.flatMap((name) => ICON_EXTENSIONS.map((ext) => `/provider-icons/${name}.${ext}`))
+    return basenames.flatMap((name) => ICON_EXTENSIONS.map((ext) => `${PROVIDER_ICON_BASE}${name}.${ext}`))
   }, [type])
   const [sourceIndex, setSourceIndex] = useState(0)
   const wrapperClassName = cn(className, 'shrink-0 rounded-md overflow-hidden')

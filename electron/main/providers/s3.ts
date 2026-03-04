@@ -36,6 +36,19 @@ function isMultiDeleteNotImplemented(err: any): boolean {
   return msg.includes('post ?delete is not implemented') || details.includes('post ?delete is not implemented')
 }
 
+function isNotFoundDeleteError(err: any): boolean {
+  const statusCode = Number(err?.$metadata?.httpStatusCode || err?.statusCode || 0)
+  const code = String(err?.Code || err?.code || err?.name || '').toLowerCase()
+  const msg = String(err?.message || '').toLowerCase()
+  return (
+    statusCode === 404 ||
+    code.includes('nosuchkey') ||
+    code.includes('notfound') ||
+    msg.includes('no such key') ||
+    msg.includes('not found')
+  )
+}
+
 export class S3Provider extends StorageProvider {
   protected client: S3Client
 
@@ -306,7 +319,12 @@ export class S3Provider extends StorageProvider {
       // Some S3-compatible providers (e.g. GCS XML API) don't implement POST ?delete.
       if (!isMultiDeleteNotImplemented(err)) throw err
       for (const key of allKeys) {
-        await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+        try {
+          await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+        } catch (deleteErr: any) {
+          // Ignore missing keys (common for virtual folder marker deletes).
+          if (!isNotFoundDeleteError(deleteErr)) throw deleteErr
+        }
       }
     }
   }
