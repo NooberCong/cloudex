@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.1] - 2026-03-04
+
+### Fixed
+
+- GCS folder delete flow now handles missing folder-marker keys during fallback per-object delete, preventing stuck delete dialog states
+- Provider icon asset paths now resolve correctly in packaged/installed builds (not only dev), so custom provider icons display in release app
+
 ## [1.4.0] - 2026-03-04
 
 ### Added
@@ -142,3 +149,4 @@ First public release of CloudEx.
 [1.2.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.2.0
 [1.3.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.3.0
 [1.4.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.4.0
+[1.4.1]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.4.1
