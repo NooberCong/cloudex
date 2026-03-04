@@ -128,6 +128,78 @@ Minimum permissions depend on features you use. Typical permissions include:
 
 Only grant `s3:ListAllMyBuckets` if you need global bucket listing.
 
+## Provider Credential Quick Guide
+
+Use this section when adding a connection in CloudEx.
+
+### AWS S3
+
+- Access Key ID: IAM access key ID
+- Secret Access Key: IAM secret access key
+- Region: your bucket region (for example `us-east-1`)
+- Quirks:
+  - Bucket Name is optional; set it to use bucket-scoped mode.
+  - If account-wide listing fails, either grant `s3:ListAllMyBuckets` or set Bucket Name.
+
+### Cloudflare R2
+
+- Access Key ID: R2 API token access key ID
+- Secret Access Key: R2 API token secret
+- Account ID: optional in CloudEx if you provide full endpoint
+- Quirks:
+  - You must provide either Account ID or a custom endpoint.
+  - Region is `auto`.
+
+### Backblaze B2 (S3 API)
+
+- Access Key ID: keyID from B2 application key
+- Secret Access Key: application key secret
+- Region: B2 S3 region (for example `us-west-004`)
+- Quirks:
+  - Endpoint defaults to `https://s3.<region>.backblazeb2.com`.
+
+### Wasabi
+
+- Access Key ID: Wasabi access key
+- Secret Access Key: Wasabi secret key
+- Region: Wasabi region (for example `us-east-1`)
+- Quirks:
+  - Endpoint defaults to `https://s3.<region>.wasabisys.com`.
+
+### MinIO
+
+- Access Key ID: MinIO access key
+- Secret Access Key: MinIO secret key
+- Region: usually `us-east-1`
+- Quirks:
+  - Default endpoint is `http://127.0.0.1:9000`.
+  - Set your server endpoint explicitly for remote/self-hosted deployments.
+
+### DigitalOcean Spaces
+
+- Access Key ID: Spaces access key
+- Secret Access Key: Spaces secret key
+- Region: Spaces region slug (for example `nyc3`)
+- Quirks:
+  - Endpoint defaults to `https://<region>.digitaloceanspaces.com`.
+
+### Google Cloud Storage (HMAC)
+
+- Access Key ID: GCS HMAC access key
+- Secret Access Key: GCS HMAC secret
+- Quirks:
+  - CloudEx uses bucket-scoped mode for GCS: Bucket Name is required.
+  - Use HMAC credentials (Interoperability keys), not service-account JSON key files.
+
+### Azure Blob Storage
+
+- Access Key ID field in CloudEx: Azure Storage Account Name
+- Secret Access Key field in CloudEx: Azure Storage Account Key
+- Quirks:
+  - Endpoint defaults to `https://<account>.blob.core.windows.net`.
+  - Bucket Name field maps to container scope (optional, but recommended for least privilege).
+  - In Azure Portal, credentials are under Storage Account -> Access keys.
+
 ## Project Structure
 
 ```text
