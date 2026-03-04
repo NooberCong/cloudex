@@ -1,6 +1,6 @@
 {
   "name": "cloudex",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A clean, full-featured desktop file manager for S3-compatible object storage.",
   "main": "out/main/index.js",
   "scripts": {
