@@ -259,7 +259,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
 
             {typeMenuOpen && (
               <div className="absolute z-20 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg overflow-hidden p-1">
-                {(['aws-s3', 'cloudflare-r2', 'backblaze-b2', 'wasabi-s3', 'minio-s3', 'digitalocean-spaces', 'google-cloud-storage', 'azure-blob-storage'] as const).map((type) => (
+                {(['aws-s3', 'azure-blob-storage', 'google-cloud-storage', 'cloudflare-r2', 'digitalocean-spaces', 'minio-s3', 'wasabi-s3', 'backblaze-b2'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"

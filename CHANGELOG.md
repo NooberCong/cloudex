@@ -20,6 +20,8 @@ All notable changes to this project are documented in this file.
 - Operation success toasts now include involved item names (`Deleted`, `Copied`, `Moved`)
 - Settings provider rows now show richer provider-specific details (including Azure account/endpoint)
 - Settings page provider action controls (`Add`, `Edit`, `Delete`) restyled to match app aesthetics
+- Add Provider dropdown now orders providers by popularity for faster selection
+- README now includes a provider credential quick guide and setup quirks per provider
 
 ### Fixed
 
