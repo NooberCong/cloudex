@@ -4,6 +4,7 @@ import {
   ListObjectsV2Command,
   ListObjectsV2CommandOutput,
   DeleteObjectsCommand,
+  DeleteObjectCommand,
   CopyObjectCommand,
   PutObjectCommand,
   HeadObjectCommand,
@@ -27,6 +28,13 @@ import type {
 import { StorageProvider, type ProgressCallback } from './base'
 
 const LIST_PAGE_SIZE = 30
+
+function isMultiDeleteNotImplemented(err: any): boolean {
+  if (err?.Code === 'NotImplemented' || err?.name === 'NotImplemented') return true
+  const msg = String(err?.message || '').toLowerCase()
+  const details = String(err?.Details || '').toLowerCase()
+  return msg.includes('post ?delete is not implemented') || details.includes('post ?delete is not implemented')
+}
 
 export class S3Provider extends StorageProvider {
   protected client: S3Client
@@ -278,20 +286,28 @@ export class S3Provider extends StorageProvider {
     const allKeys = [...expanded]
     if (allKeys.length === 0) return
 
-    // S3 deleteObjects supports up to 1000 per request
-    const chunks: string[][] = []
-    for (let i = 0; i < allKeys.length; i += 1000) {
-      chunks.push(allKeys.slice(i, i + 1000))
-    }
-    for (const chunk of chunks) {
-      const cmd = new DeleteObjectsCommand({
-        Bucket: bucket,
-        Delete: {
-          Objects: chunk.map((Key) => ({ Key })),
-          Quiet: true
-        }
-      })
-      await this.client.send(cmd)
+    try {
+      // S3 deleteObjects supports up to 1000 per request
+      const chunks: string[][] = []
+      for (let i = 0; i < allKeys.length; i += 1000) {
+        chunks.push(allKeys.slice(i, i + 1000))
+      }
+      for (const chunk of chunks) {
+        const cmd = new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: {
+            Objects: chunk.map((Key) => ({ Key })),
+            Quiet: true
+          }
+        })
+        await this.client.send(cmd)
+      }
+    } catch (err: any) {
+      // Some S3-compatible providers (e.g. GCS XML API) don't implement POST ?delete.
+      if (!isMultiDeleteNotImplemented(err)) throw err
+      for (const key of allKeys) {
+        await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+      }
     }
   }
 

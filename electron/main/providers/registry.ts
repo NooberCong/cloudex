@@ -6,6 +6,8 @@ import { B2Provider } from './b2'
 import { WasabiProvider } from './wasabi'
 import { MinIOProvider } from './minio'
 import { SpacesProvider } from './spaces'
+import { GCSProvider } from './gcs'
+import { AzureBlobProvider } from './azure'
 
 // Cache provider instances so we don't recreate clients on every call
 const cache = new Map<string, StorageProvider>()
@@ -37,6 +39,10 @@ function createProvider(config: ProviderConfig): StorageProvider {
       return new MinIOProvider(config)
     case 'digitalocean-spaces':
       return new SpacesProvider(config)
+    case 'google-cloud-storage':
+      return new GCSProvider(config)
+    case 'azure-blob-storage':
+      return new AzureBlobProvider(config)
     default:
       throw new Error(`Unknown provider type: ${(config as any).type}`)
   }

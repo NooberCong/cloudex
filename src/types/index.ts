@@ -7,6 +7,8 @@ export type ProviderType =
   | 'wasabi-s3'
   | 'minio-s3'
   | 'digitalocean-spaces'
+  | 'google-cloud-storage'
+  | 'azure-blob-storage'
 
 export interface ProviderConfig {
   id: string

@@ -8,6 +8,8 @@ Place your custom provider icons in this folder using these exact basenames:
 - wasabi-s3
 - minio-s3
 - digitalocean-spaces
+- google-cloud-storage
+- azure-blob-storage
 
 Accepted extensions (fallback order): `.svg`, `.png`, `.webp`, `.jpg`, `.jpeg`, `.gif`
 
@@ -15,5 +17,6 @@ Examples:
 - `aws-s3.webp`
 - `cloudflare-r2.png`
 - `backblaze-b2.svg`
+- `google-cloud.png` (used for Google Cloud Storage)
 
 These basenames match `ProviderType` values in `src/types/index.ts`.

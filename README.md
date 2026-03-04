@@ -3,17 +3,18 @@
 </p>
 <h1 align="center">CloudEx</h1>
 <p align="center">
-  <img alt="Electron" src="https://img.shields.io/badge/Electron-35+-47848F?logo=electron&logoColor=white" /> <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" /> <img alt="AWS S3" src="https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white" /> <img alt="Cloudflare R2" src="https://img.shields.io/badge/Cloudflare-R2-F38020?logo=cloudflare&logoColor=white" /> <img alt="Backblaze B2" src="https://img.shields.io/badge/Backblaze-B2-E85C33" /> <img alt="Wasabi" src="https://img.shields.io/badge/Wasabi-74B72E" /> <img alt="MinIO" src="https://img.shields.io/badge/MinIO-C72E49" /> <img alt="DigitalOcean Spaces" src="https://img.shields.io/badge/DO-Spaces-0080FF" /> <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E" />
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-35+-47848F?logo=electron&logoColor=white" /> <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" /> <img alt="AWS S3" src="https://img.shields.io/badge/AWS-S3-FF9900?logo=amazons3&logoColor=white" /> <img alt="Cloudflare R2" src="https://img.shields.io/badge/Cloudflare-R2-F38020?logo=cloudflare&logoColor=white" /> <img alt="Backblaze B2" src="https://img.shields.io/badge/Backblaze-B2-E85C33" /> <img alt="Wasabi" src="https://img.shields.io/badge/Wasabi-74B72E" /> <img alt="MinIO" src="https://img.shields.io/badge/MinIO-C72E49" /> <img alt="DigitalOcean Spaces" src="https://img.shields.io/badge/DO-Spaces-0080FF" /> <img alt="Google Cloud Storage" src="https://img.shields.io/badge/GCS-4285F4" /> <img alt="Azure Blob Storage" src="https://img.shields.io/badge/Azure-Blob-0078D4" /> <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22C55E" />
 </p>
 
-CloudEx is a desktop file manager for S3-compatible object storage, focused on AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, and DigitalOcean Spaces.
+CloudEx is a desktop file manager for object storage, supporting AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, DigitalOcean Spaces, Google Cloud Storage (HMAC), and Azure Blob Storage.
 
 It is built with Electron, React, TypeScript, Zustand, and the AWS SDK v3.
 
 ## Highlights
 
-- Multi-connection support for AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, and DigitalOcean Spaces
+- Multi-connection support for AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, DigitalOcean Spaces, Google Cloud Storage, and Azure Blob Storage
 - Provider type selector with icon-based dropdown in connection settings
+- Custom provider icon overrides via `assets/provider-icons` (`svg/png/webp/jpg/jpeg/gif`)
 - Bucket and object browsing with search, pagination, and auto load more
 - List and grid views
 - Upload and download with transfer progress
@@ -31,6 +32,7 @@ It is built with Electron, React, TypeScript, Zustand, and the AWS SDK v3.
 - Presigned URL generation with configurable expiration
 - Context menus and keyboard shortcuts
 - Light/dark theme support
+- Improved operation result toasts with affected-item details
 - Local encrypted storage for connection settings (`electron-store`)
 
 ## Screenshots
@@ -153,6 +155,10 @@ build/
   fully close and restart `npm run dev`.
 - AccessDenied on bucket listing:
   use bucket-scoped mode or grant `s3:ListAllMyBuckets` if account-wide listing is required.
+- Google Cloud Storage connection fails:
+  use HMAC credentials (not JSON key) and set Bucket Name (bucket-scoped mode required).
+- Azure Blob Storage credentials:
+  use Account Name as `Access Key ID` and Account Key as `Secret Access Key`.
 - Packaging issues:
   run `npm run build` first, then run a `dist:*` script.
 

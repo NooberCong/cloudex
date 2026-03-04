@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 import * as ToastPrimitive from '@radix-ui/react-toast'
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -35,14 +35,30 @@ const TOAST_DURATION_MS: Record<ToastType, number> = {
   success: 2200,
   info: 2200,
   warning: 2600,
-  // Effectively persistent until manually dismissed.
-  error: 2147483647
+  error: 4400
 }
+const TOAST_DEDUPE_WINDOW_MS = 1200
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const recentToastTimestamps = useRef(new Map<string, number>())
 
   const addToast = useCallback((opts: Omit<Toast, 'id'>) => {
+    const key = `${opts.type}|${opts.title.trim()}|${(opts.description || '').trim()}`
+    const now = Date.now()
+    const lastShownAt = recentToastTimestamps.current.get(key)
+    if (lastShownAt && now - lastShownAt < TOAST_DEDUPE_WINDOW_MS) {
+      return
+    }
+
+    // Best-effort cleanup of stale dedupe entries.
+    for (const [entryKey, shownAt] of recentToastTimestamps.current.entries()) {
+      if (now - shownAt > TOAST_DEDUPE_WINDOW_MS * 4) {
+        recentToastTimestamps.current.delete(entryKey)
+      }
+    }
+
+    recentToastTimestamps.current.set(key, now)
     const id = Math.random().toString(36).substring(2)
     setToasts((prev) => [...prev, { ...opts, id }])
   }, [])

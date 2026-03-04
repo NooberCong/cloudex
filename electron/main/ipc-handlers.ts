@@ -25,6 +25,74 @@ const OPEN_TEMP_DIR_NAME = 'cloudex-open'
 const OPEN_TEMP_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 3 // 3 days
 const ZIP_TEMP_DIR_NAME = 'cloudex-zip'
 const PROVIDER_TEST_TIMEOUT_MS = 12000
+
+function formatErrorDetails(err: any): string {
+  const code = err?.code ? `code=${String(err.code)}; ` : ''
+  const name = err?.name ? `${String(err.name)}: ` : ''
+  const message = err?.message ? String(err.message) : String(err)
+  const stackLine = typeof err?.stack === 'string'
+    ? err.stack.split('\n').map((line: string) => line.trim()).find((line: string) => line.startsWith('at ')) || ''
+    : ''
+  const stackPart = stackLine ? `; ${stackLine}` : ''
+  return `${code}${name}${message}${stackPart}`
+}
+
+function toUserFriendlyProviderTestError(err: any, config: ProviderConfig): string {
+  const name = String(err?.name || '')
+  const msg = String(err?.message || '').toLowerCase()
+
+  if (msg.includes('timed out')) {
+    return 'Connection test timed out. Check network access, endpoint, and credentials, then try again.'
+  }
+  if (name === 'AccessDenied' || name === 'SignatureDoesNotMatch') {
+    if (config.type === 'google-cloud-storage') {
+      return 'Access denied. Verify GCS HMAC credentials and bucket permissions for this account.'
+    }
+    if (config.type === 'azure-blob-storage') {
+      return 'Access denied. Verify Azure account name/key and storage permissions.'
+    }
+    return 'Access denied. Verify credentials and permissions.'
+  }
+  if (name === 'InvalidArgument') {
+    return 'Invalid connection settings. Check endpoint, region, bucket, and credential values.'
+  }
+  if (msg.includes('getaddrinfo') || msg.includes('enotfound') || msg.includes('econnrefused')) {
+    return 'Cannot reach the storage endpoint. Check endpoint URL and network connectivity.'
+  }
+  if (msg.includes('ssl') || msg.includes('certificate')) {
+    return 'TLS/SSL validation failed. Check endpoint certificate settings and URL.'
+  }
+  return 'Connection failed. Verify settings and try again.'
+}
+
+function logProviderTestError(config: ProviderConfig, err: any): void {
+  const safeConfig = {
+    id: config.id,
+    name: config.name,
+    type: config.type,
+    region: config.region,
+    endpoint: config.endpoint,
+    accountId: config.accountId,
+    defaultBucket: config.defaultBucket
+  }
+  console.error('[providers:test] failed', {
+    provider: safeConfig,
+    code: err?.code,
+    name: err?.name,
+    message: err?.message,
+    stack: err?.stack
+  })
+}
+
+function isNotFoundError(err: any): boolean {
+  const statusCode = Number(err?.statusCode || err?.$metadata?.httpStatusCode || 0)
+  const code = String(err?.code || err?.Code || err?.name || err?.details?.errorCode || '').toLowerCase()
+  const msg = String(err?.message || '').toLowerCase()
+  if (statusCode === 404) return true
+  if (code.includes('notfound') || code.includes('nosuchkey') || code === 'blobnotfound') return true
+  return msg.includes('not found') || msg.includes('no such key')
+}
+
 function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
 }
@@ -300,7 +368,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       ])
       return { success: true }
     } catch (err: any) {
-      return { success: false, error: err?.message || String(err) }
+      logProviderTestError(config, err)
+      console.error('[providers:test] details', formatErrorDetails(err))
+      return { success: false, error: toUserFriendlyProviderTestError(err, config) }
     }
   })
 
@@ -411,6 +481,19 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     if (!config) throw new Error(`Provider not found: ${providerId}`)
     const provider = getProviderInstance(config)
     return provider.getObjectMetadata(bucket, key)
+  })
+
+  ipcMain.handle('objects:exists', async (_e, providerId: string, bucket: string, key: string) => {
+    const config = getProvider(providerId)
+    if (!config) throw new Error(`Provider not found: ${providerId}`)
+    const provider = getProviderInstance(config)
+    try {
+      await provider.getObjectMetadata(bucket, key)
+      return true
+    } catch (err: any) {
+      if (isNotFoundError(err)) return false
+      throw err
+    }
   })
 
   ipcMain.handle(

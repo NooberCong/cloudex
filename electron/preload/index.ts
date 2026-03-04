@@ -44,6 +44,8 @@ const api = {
       ipcRenderer.invoke('objects:presignedUrl', options),
     metadata: (providerId: string, bucket: string, key: string) =>
       ipcRenderer.invoke('objects:metadata', providerId, bucket, key),
+    exists: (providerId: string, bucket: string, key: string) =>
+      ipcRenderer.invoke('objects:exists', providerId, bucket, key),
     open: (providerId: string, bucket: string, key: string) =>
       ipcRenderer.invoke('objects:open', providerId, bucket, key),
     updateMetadata: (

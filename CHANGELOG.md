@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.0] - 2026-03-04
+
+### Added
+
+- Google Cloud Storage provider support (HMAC credentials, bucket-scoped mode)
+- Azure Blob Storage provider support (native Azure SDK provider)
+- Custom provider icon file support from `assets/provider-icons` with extension fallback
+- Provider-aware icon rendering across Add Provider, Sidebar, and Settings
+- `objects:exists` IPC endpoint to avoid metadata-error spam during existence checks
+
+### Changed
+
+- GCS now requires bucket name in Add Provider flow (bucket-scoped mode)
+- Test Connection now returns user-friendly error text in UI while logging full details in terminal
+- Error toasts now auto-dismiss (2x success duration) instead of persisting indefinitely
+- Operation success toasts now include involved item names (`Deleted`, `Copied`, `Moved`)
+- Settings provider rows now show richer provider-specific details (including Azure account/endpoint)
+- Settings page provider action controls (`Add`, `Edit`, `Delete`) restyled to match app aesthetics
+
+### Fixed
+
+- GCS move/cut delete failures caused by unsupported `POST ?delete` now fall back to per-object delete
+- Duplicate operation toasts are deduplicated in a short window
+- Azure `BlobNotFound` noisy metadata errors during expected existence checks
+
 ## [1.3.0] - 2026-03-03
 
 ### Added
@@ -114,3 +139,4 @@ First public release of CloudEx.
 [1.1.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.1.0
 [1.2.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.2.0
 [1.3.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.3.0
+[1.4.0]: https://github.com/<your-org>/<your-repo>/releases/tag/v1.4.0

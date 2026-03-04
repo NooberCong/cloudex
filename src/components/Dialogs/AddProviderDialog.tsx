@@ -103,6 +103,8 @@ const isB2Type = (type: ProviderType) => type === 'backblaze-b2'
 const isWasabiType = (type: ProviderType) => type === 'wasabi-s3'
 const isMinIOType = (type: ProviderType) => type === 'minio-s3'
 const isSpacesType = (type: ProviderType) => type === 'digitalocean-spaces'
+const isGcsType = (type: ProviderType) => type === 'google-cloud-storage'
+const isAzureType = (type: ProviderType) => type === 'azure-blob-storage'
 
 const defaultRegionForType = (type: ProviderType) => {
   if (isR2Type(type)) return 'auto'
@@ -110,6 +112,8 @@ const defaultRegionForType = (type: ProviderType) => {
   if (isWasabiType(type)) return 'us-east-1'
   if (isMinIOType(type)) return 'us-east-1'
   if (isSpacesType(type)) return 'nyc3'
+  if (isGcsType(type)) return 'us-east-1'
+  if (isAzureType(type)) return 'global'
   return 'us-east-1'
 }
 
@@ -175,6 +179,9 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   })
 
   const handleTest = async () => {
+    if (form.type === 'google-cloud-storage' && !form.defaultBucket.trim()) {
+      return toast.error('Google Cloud Storage requires Bucket Name')
+    }
     setTesting(true)
     setTestResult(null)
     try {
@@ -191,6 +198,9 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
     if (!form.secretAccessKey) return toast.error('Secret Access Key is required')
     if (form.type === 'cloudflare-r2' && !form.endpoint.trim() && !form.accountId.trim()) {
       return toast.error('R2 requires either Account ID or Endpoint URL')
+    }
+    if (form.type === 'google-cloud-storage' && !form.defaultBucket.trim()) {
+      return toast.error('Google Cloud Storage requires Bucket Name')
     }
 
     setSaving(true)
@@ -210,6 +220,8 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
   const isWasabi = isWasabiType(form.type)
   const isMinIO = isMinIOType(form.type)
   const isSpaces = isSpacesType(form.type)
+  const isGcs = isGcsType(form.type)
+  const isAzure = isAzureType(form.type)
   const suggestedRegions = isB2
     ? B2_STANDARD_REGIONS
     : (isWasabi
@@ -224,7 +236,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
       open={open}
       onOpenChange={onOpenChange}
       title={editing ? 'Edit Provider' : 'Add Storage Provider'}
-      description="Connect to AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, or DigitalOcean Spaces"
+      description=""
     >
       <div className="space-y-4">
         <div>
@@ -247,7 +259,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
 
             {typeMenuOpen && (
               <div className="absolute z-20 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg overflow-hidden p-1">
-                {(['aws-s3', 'cloudflare-r2', 'backblaze-b2', 'wasabi-s3', 'minio-s3', 'digitalocean-spaces'] as const).map((type) => (
+                {(['aws-s3', 'cloudflare-r2', 'backblaze-b2', 'wasabi-s3', 'minio-s3', 'digitalocean-spaces', 'google-cloud-storage', 'azure-blob-storage'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -280,7 +292,11 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
                   ? 'My B2 Storage'
                   : (isWasabi
                     ? 'My Wasabi Storage'
-                    : (isMinIO ? 'My MinIO Storage' : (isSpaces ? 'My Spaces Storage' : 'My S3 Bucket'))))
+                    : (isMinIO
+                      ? 'My MinIO Storage'
+                      : (isSpaces
+                        ? 'My Spaces Storage'
+                        : (isGcs ? 'My GCS Bucket' : (isAzure ? 'My Azure Storage' : 'My S3 Bucket'))))))
             }
             value={form.name}
             onChange={(e) => update('name', e.target.value)}
@@ -288,9 +304,15 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           />
         </Field>
 
-        <Field label="Access Key ID" required>
+        <Field label={isAzure ? 'Account Name' : 'Access Key ID'} required>
           <input
-            placeholder={isR2 ? 'R2 API Token ID' : (isB2 ? 'B2 keyID' : 'AKIAIOSFODNN7EXAMPLE')}
+            placeholder={
+              isR2
+                ? 'R2 API Token ID'
+                : (isB2
+                  ? 'B2 keyID'
+                  : (isGcs ? 'GCS HMAC Access Key' : (isAzure ? 'Azure Storage Account Name' : 'AKIAIOSFODNN7EXAMPLE')))
+            }
             value={form.accessKeyId}
             onChange={(e) => update('accessKeyId', e.target.value)}
             autoComplete="off"
@@ -298,10 +320,10 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           />
         </Field>
 
-        <Field label="Secret Access Key" required>
+        <Field label={isAzure ? 'Account Key' : 'Secret Access Key'} required>
           <input
             type="password"
-            placeholder="********************"
+            placeholder={isGcs ? 'GCS HMAC Secret' : (isAzure ? 'Azure Storage Account Key' : '********************')}
             value={form.secretAccessKey}
             onChange={(e) => update('secretAccessKey', e.target.value)}
             autoComplete="new-password"
@@ -309,7 +331,7 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
           />
         </Field>
 
-        {!isR2 && (
+        {!isR2 && !isGcs && !isAzure && (
           <Field
             label="Region"
             hint={
@@ -400,9 +422,13 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
                   ? 'Optional - defaults to s3.<region>.wasabisys.com'
                   : (isMinIO
                     ? 'Optional - defaults to http://127.0.0.1:9000'
-                    : (isSpaces
-                      ? 'Optional - defaults to https://<region>.digitaloceanspaces.com'
-                      : 'Optional - for S3-compatible services or VPCs')))
+                    : (isGcs
+                      ? 'Optional - defaults to https://storage.googleapis.com'
+                      : (isAzure
+                        ? 'Optional - defaults to https://<account>.blob.core.windows.net'
+                        : (isSpaces
+                          ? 'Optional - defaults to https://<region>.digitaloceanspaces.com'
+                          : 'Optional - for S3-compatible services or VPCs')))))
             }
           >
             <input
@@ -413,7 +439,11 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
                     ? 'https://s3.us-east-1.wasabisys.com'
                     : (isMinIO
                       ? 'http://127.0.0.1:9000'
-                      : (isSpaces ? 'https://nyc3.digitaloceanspaces.com' : 'https://s3.example.com')))
+                      : (isGcs
+                        ? 'https://storage.googleapis.com'
+                        : (isAzure
+                          ? 'https://<account>.blob.core.windows.net'
+                          : (isSpaces ? 'https://nyc3.digitaloceanspaces.com' : 'https://s3.example.com')))))
               }
               value={form.endpoint}
               onChange={(e) => update('endpoint', e.target.value)}
@@ -424,7 +454,14 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
 
         <Field
           label="Bucket Name"
-          hint="Optional - if set, CloudEx uses only this bucket and skips ListAllMyBuckets"
+          hint={
+            isGcs
+              ? 'Required for Google Cloud Storage (CloudEx uses bucket-scoped mode)'
+              : (isAzure
+                ? 'Optional container name - if set, CloudEx scopes to this container'
+                : 'Optional - if set, CloudEx uses only this bucket and skips ListAllMyBuckets')
+          }
+          required={isGcs}
         >
           <input
             placeholder="my-app-bucket"

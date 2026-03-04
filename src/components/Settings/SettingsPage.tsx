@@ -15,6 +15,41 @@ interface SettingsPageProps {
   onThemeChange: (t: Theme) => void
 }
 
+function tryGetHostname(urlOrHost?: string): string | undefined {
+  if (!urlOrHost) return undefined
+  try {
+    return new URL(urlOrHost).hostname
+  } catch {
+    return urlOrHost.replace(/^https?:\/\//i, '')
+  }
+}
+
+function getProviderDetails(p: ProviderConfig): string {
+  const parts: string[] = [getProviderLabel(p.type)]
+  const scopedBucket = p.defaultBucket || p.allowedBuckets?.[0]
+
+  if (p.type === 'azure-blob-storage') {
+    const accountName = p.accessKeyId?.trim()
+    if (accountName) parts.push(`account: ${accountName}`)
+    const endpoint = p.endpoint?.trim() || (accountName ? `https://${accountName}.blob.core.windows.net` : undefined)
+    const host = tryGetHostname(endpoint)
+    if (host) parts.push(host)
+    if (scopedBucket) parts.push(`container: ${scopedBucket}`)
+    return parts.join(' - ')
+  }
+
+  if (p.region?.trim()) parts.push(p.region.trim())
+  if (p.type === 'google-cloud-storage') {
+    const host = tryGetHostname(p.endpoint?.trim() || 'https://storage.googleapis.com')
+    if (host) parts.push(host)
+  } else if (p.endpoint) {
+    const host = tryGetHostname(p.endpoint)
+    if (host) parts.push(host)
+  }
+  if (scopedBucket) parts.push(`bucket: ${scopedBucket}`)
+  return parts.join(' - ')
+}
+
 export function SettingsPage({
   onClose, onEditProvider, onAddProvider, onDeleteProvider, deletingProviderId, theme, onThemeChange
 }: SettingsPageProps) {
@@ -38,8 +73,14 @@ export function SettingsPage({
             <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
               Storage Providers
             </h2>
-            <Button variant="outline" size="xs" icon={<Plus className="w-3 h-3" />} onClick={onAddProvider}>
-              Add
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={onAddProvider}
+              className="h-8 rounded-lg shadow-sm"
+            >
+              Add Provider
             </Button>
           </div>
 
@@ -52,7 +93,7 @@ export function SettingsPage({
               {providers.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                  className="group flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-strong)] transition-colors shadow-[0_1px_0_0_rgba(0,0,0,0.04)]"
                 >
                   <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
                     <ProviderIcon type={p.type} className="w-full h-full" />
@@ -62,29 +103,29 @@ export function SettingsPage({
                       {p.name}
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">
-                      {getProviderLabel(p.type)} - {p.region}
-                      {p.endpoint ? ` - ${new URL(p.endpoint).hostname}` : ''}
-                      {(p.defaultBucket || p.allowedBuckets?.[0])
-                        ? ` - bucket: ${p.defaultBucket || p.allowedBuckets?.[0]}`
-                        : ''}
+                      {getProviderDetails(p)}
                     </p>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      icon={<Pencil className="w-3 h-3" />}
+                  <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <button
                       onClick={() => onEditProvider(p)}
-                      title="Edit"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      icon={<Trash2 className="w-3 h-3 text-[var(--danger)]" />}
-                      loading={deletingProviderId === p.id}
+                      title="Edit provider"
+                      className="h-8 w-8 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors inline-flex items-center justify-center"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => onDeleteProvider(p)}
-                      title="Remove"
-                    />
+                      title="Delete provider"
+                      disabled={deletingProviderId === p.id}
+                      className="h-8 w-8 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--danger)] hover:border-[color-mix(in_srgb,var(--danger)_50%,var(--border))] hover:bg-[var(--danger-light)] transition-colors inline-flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingProviderId === p.id ? (
+                        <span className="inline-block w-3.5 h-3.5 border-2 border-[var(--danger)] border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -128,7 +169,7 @@ export function SettingsPage({
           <div className="p-3 rounded-xl border border-[var(--border)] space-y-1">
             <p className="text-sm font-medium text-[var(--text-primary)]">CloudEx</p>
             <p className="text-xs text-[var(--text-muted)]">
-              Desktop file manager for AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, and DigitalOcean Spaces
+              Desktop file manager for AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO, DigitalOcean Spaces, Google Cloud Storage, and Azure Blob Storage
             </p>
           </div>
         </section>

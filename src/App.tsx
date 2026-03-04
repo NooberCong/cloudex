@@ -19,6 +19,20 @@ import { useToast } from './components/UI/Toast'
 import { Loader2 } from 'lucide-react'
 import type { S3Object, ProviderConfig, Theme } from './types'
 
+function keyToDisplayName(key: string): string {
+  const trimmed = key.endsWith('/') ? key.slice(0, -1) : key
+  const leaf = trimmed.split('/').pop() || trimmed
+  return key.endsWith('/') ? `${leaf}/` : leaf
+}
+
+function formatItemsDescription(items: string[], maxItems = 5): string {
+  if (items.length === 0) return ''
+  const unique = [...new Set(items.filter(Boolean))]
+  const shown = unique.slice(0, maxItems)
+  const remaining = unique.length - shown.length
+  return remaining > 0 ? `${shown.join(', ')} +${remaining} more` : shown.join(', ')
+}
+
 export function App() {
   type UploadConflictChoice = 'overwrite' | 'skip' | 'cancel'
   const toast = useToast()
@@ -169,7 +183,10 @@ export function App() {
     if (removedFolderPrefixes.length > 0) {
       pruneHistoryPaths(location.providerId, location.bucket, removedFolderPrefixes)
     }
-    toast.success(`Deleted ${deleteKeys.length} item${deleteKeys.length > 1 ? 's' : ''}`)
+    toast.success(
+      `Deleted ${deleteKeys.length} item${deleteKeys.length > 1 ? 's' : ''}`,
+      formatItemsDescription(deleteKeys.map(keyToDisplayName))
+    )
     clearSelection()
     refresh()
   }
@@ -213,10 +230,8 @@ export function App() {
 
     let destinationExists = false
     if (renameTarget.isFolder) {
-      try {
-        await window.api.objects.metadata(location.providerId, location.bucket, newKey)
-        destinationExists = true
-      } catch {
+      destinationExists = await window.api.objects.exists(location.providerId, location.bucket, newKey)
+      if (!destinationExists) {
         const listed = await window.api.objects.list(location.providerId, location.bucket, newKey)
         destinationExists = listed.objects.length > 0 || listed.prefixes.length > 0
       }
@@ -241,11 +256,8 @@ export function App() {
     const prefix = location.prefix + name
     const fileExists = await objectExists(location.providerId, location.bucket, prefix)
     const folderKey = `${prefix}/`
-    let folderExists = false
-    try {
-      await window.api.objects.metadata(location.providerId, location.bucket, folderKey)
-      folderExists = true
-    } catch {
+    let folderExists = await window.api.objects.exists(location.providerId, location.bucket, folderKey)
+    if (!folderExists) {
       const listed = await window.api.objects.list(location.providerId, location.bucket, folderKey)
       folderExists = listed.objects.length > 0 || listed.prefixes.length > 0
     }
@@ -349,7 +361,10 @@ export function App() {
       const key = location.prefix + relativePath
 
       try {
-        await window.api.objects.metadata(location.providerId, location.bucket, key)
+        const exists = await window.api.objects.exists(location.providerId, location.bucket, key)
+        if (!exists) {
+          throw new Error('NotFound')
+        }
         const choice = await requestUploadConflict(relativePath)
         if (choice === 'cancel') {
           canceledByUser = true
@@ -508,14 +523,15 @@ export function App() {
     key: string
   ): Promise<boolean> => {
     try {
-      await window.api.objects.metadata(providerId, bucket, key)
-      return true
+      return await window.api.objects.exists(providerId, bucket, key)
     } catch (e: any) {
       const msg = String(e?.message || e || '').toLowerCase()
       if (
         msg.includes('notfound') ||
+        msg.includes('blobnotfound') ||
         msg.includes('no such key') ||
         msg.includes('nosuchkey') ||
+        msg.includes('"statuscode": 404') ||
         msg.includes('status code: 404') ||
         msg.includes('httpstatuscode: 404') ||
         msg.includes('not found')
@@ -562,6 +578,7 @@ export function App() {
     setClipboardBusy({ action: 'paste', count: keys.length })
     let changedCount = 0
     let skippedSameTarget = 0
+    const changedItems: string[] = []
     try {
       for (const srcKey of keys) {
         const srcTrimmed = srcKey.endsWith('/') ? srcKey.slice(0, -1) : srcKey
@@ -595,13 +612,17 @@ export function App() {
             await window.api.objects.delete(src.providerId, src.bucket, [srcKey])
           }
           changedCount++
+          changedItems.push(keyToDisplayName(srcKey))
         } catch (e: any) {
           toast.error(`Failed to ${action} ${fileName}`, e?.message)
         }
       }
 
       if (changedCount > 0) {
-        toast.success(`${action === 'copy' ? 'Copied' : 'Moved'} ${changedCount} item${changedCount > 1 ? 's' : ''}`)
+        toast.success(
+          `${action === 'copy' ? 'Copied' : 'Moved'} ${changedCount} item${changedCount > 1 ? 's' : ''}`,
+          formatItemsDescription(changedItems)
+        )
         clearClipboard()
         refresh()
         return
@@ -636,6 +657,7 @@ export function App() {
 
     setClipboardBusy({ action: 'move', count: keys.length })
     let movedCount = 0
+    const movedItems: string[] = []
     try {
       for (const srcKey of keys) {
         const srcTrimmed = srcKey.endsWith('/') ? srcKey.slice(0, -1) : srcKey
@@ -659,12 +681,16 @@ export function App() {
           })
           await window.api.objects.delete(location.providerId, location.bucket, [srcKey])
           movedCount++
+          movedItems.push(srcKey.endsWith('/') ? `${leafName}/` : leafName)
         } catch (e: any) {
           toast.error(`Failed to move ${leafName}`, e?.message)
         }
       }
       if (movedCount > 0) {
-        toast.success(`Moved ${movedCount} item${movedCount > 1 ? 's' : ''}`)
+        toast.success(
+          `Moved ${movedCount} item${movedCount > 1 ? 's' : ''}`,
+          formatItemsDescription(movedItems)
+        )
         refresh()
       }
     } finally {
