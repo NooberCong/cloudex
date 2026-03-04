@@ -85,6 +85,7 @@ export function FileList({
   const marqueeRafRef = useRef<number | null>(null)
   const suppressClickRef = useRef(false)
   const suppressClickTimerRef = useRef<number | null>(null)
+  const rowContextMenuKeysRef = useRef<string[] | null>(null)
   const [marquee, setMarquee] = useState<{
     startX: number
     startY: number
@@ -228,6 +229,12 @@ export function FileList({
   const applyExactSelection = useCallback((keys: string[]) => {
     setSelection(keys)
   }, [setSelection])
+
+  const resolveRowContextActionKeys = useCallback((rowKey: string): string[] => {
+    const contextual = rowContextMenuKeysRef.current
+    if (contextual && contextual.length > 0) return contextual
+    return selectedKeySet.has(rowKey) ? [...selectedKeys] : [rowKey]
+  }, [selectedKeySet, selectedKeys])
 
   const rectsIntersect = (a: { left: number; right: number; top: number; bottom: number }, b: DOMRect) => {
     return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom)
@@ -487,7 +494,12 @@ export function FileList({
                   const isCut = cutKeys.has(obj.key)
 
                   return (
-                    <ContextMenu.Root key={obj.key}>
+                    <ContextMenu.Root
+                      key={obj.key}
+                      onOpenChange={(open) => {
+                        if (!open) rowContextMenuKeysRef.current = null
+                      }}
+                    >
                       <ContextMenu.Trigger asChild>
                         <div
                           ref={(el) => setItemRef(obj.key, el)}
@@ -505,7 +517,11 @@ export function FileList({
                           )}
                           onClick={(e) => handleRowClick(obj.key, e)}
                           onContextMenu={() => {
-                            if (!selectedKeySet.has(obj.key)) selectKey(obj.key, false, false)
+                            const nextKeys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
+                            rowContextMenuKeysRef.current = nextKeys
+                            if (nextKeys.length === 1 && nextKeys[0] === obj.key && !selectedKeySet.has(obj.key)) {
+                              setSelection([obj.key])
+                            }
                           }}
                           onDoubleClick={() => handleRowDoubleClick(obj)}
                           onDragStart={(e) => {
@@ -602,7 +618,7 @@ export function FileList({
                             icon={<Copy className="w-3.5 h-3.5" />}
                             label="Copy"
                             onClick={() => {
-                              const keys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
+                              const keys = resolveRowContextActionKeys(obj.key)
                               setClipboard('copy', keys)
                             }}
                           />
@@ -610,7 +626,7 @@ export function FileList({
                             icon={<Scissors className="w-3.5 h-3.5" />}
                             label="Cut"
                             onClick={() => {
-                              const keys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
+                              const keys = resolveRowContextActionKeys(obj.key)
                               setClipboard('move', keys)
                             }}
                           />
@@ -634,12 +650,13 @@ export function FileList({
                           <ContextMenu.Separator className="my-1 border-t border-[var(--border)]" />
                           <ContextMenuItem
                             icon={<Trash2 className="w-3.5 h-3.5" />}
-                            label={selectedKeys.length > 1 && selectedKeySet.has(obj.key)
-                              ? `Delete ${selectedKeys.length} items`
-                              : 'Delete'}
+                            label={(() => {
+                              const keys = resolveRowContextActionKeys(obj.key)
+                              return keys.length > 1 ? `Delete ${keys.length} items` : 'Delete'
+                            })()}
                             danger
                             onClick={() => {
-                              const keys = selectedKeySet.has(obj.key) ? [...selectedKeys] : [obj.key]
+                              const keys = resolveRowContextActionKeys(obj.key)
                               onDelete(keys)
                             }}
                           />

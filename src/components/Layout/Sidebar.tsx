@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react'
 import {
-  Cloud, HardDrive, ChevronRight, ChevronDown,
+  ChevronRight, ChevronDown,
   Loader2, Plus, Settings, AlertCircle, RefreshCw, Database, Pencil, Trash2
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useProvidersStore } from '../../store/providers'
 import { useExplorerStore } from '../../store/explorer'
 import type { ProviderConfig, BucketInfo } from '../../types'
+import { ProviderIcon, getProviderLabel } from '../Providers/ProviderIcon'
 
 interface SidebarProps {
   onAddProvider: () => void
@@ -15,30 +16,6 @@ interface SidebarProps {
   onEditProvider: (provider: ProviderConfig) => void
   onDeleteProvider: (provider: ProviderConfig) => void
 }
-
-const providerIcon = (type: ProviderConfig['type']) =>
-  type === 'aws-s3' ? (
-    <Cloud className="w-3.5 h-3.5 text-[#FF9900]" />
-  ) : type === 'digitalocean-spaces' ? (
-    <HardDrive className="w-3.5 h-3.5 text-[#0080FF]" />
-  ) : type === 'minio-s3' ? (
-    <HardDrive className="w-3.5 h-3.5 text-[#C72E49]" />
-  ) : type === 'wasabi-s3' ? (
-    <HardDrive className="w-3.5 h-3.5 text-[#74B72E]" />
-  ) : type === 'backblaze-b2' ? (
-    <HardDrive className="w-3.5 h-3.5 text-[#E85C33]" />
-  ) : (
-    <HardDrive className="w-3.5 h-3.5 text-[#F48120]" />
-  )
-
-const providerLabel = (type: ProviderConfig['type']) =>
-  type === 'aws-s3'
-    ? 'AWS S3'
-    : (type === 'backblaze-b2'
-      ? 'Backblaze B2'
-      : (type === 'wasabi-s3'
-        ? 'Wasabi'
-        : (type === 'minio-s3' ? 'MinIO' : (type === 'digitalocean-spaces' ? 'DigitalOcean Spaces' : 'Cloudflare R2'))))
 
 export function Sidebar({
   onAddProvider,
@@ -153,13 +130,13 @@ export function Sidebar({
                     <ChevronRight className="w-3 h-3" />
                   )}
                 </span>
-                {providerIcon(provider.type)}
+                <ProviderIcon type={provider.type} className="w-3.5 h-3.5" />
                 <div className="flex-1 min-w-0 flex items-center gap-2">
                   <span className="flex-1 text-xs font-medium truncate" title={provider.name}>
                     {provider.name}
                   </span>
                   <span className="text-[10px] text-[var(--text-muted)] shrink-0 transition-opacity group-hover:opacity-0">
-                    {providerLabel(provider.type)}
+                    {getProviderLabel(provider.type)}
                   </span>
                 </div>
                 <div className="absolute right-2 flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

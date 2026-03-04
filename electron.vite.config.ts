@@ -30,7 +30,8 @@ export default defineConfig({
   },
   renderer: {
     root: resolve('src'),
-    assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg'],
+    publicDir: resolve('assets'),
+    assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.webp', '**/*.gif'],
     build: {
       rollupOptions: {
         input: resolve('src/index.html')

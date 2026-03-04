@@ -1,8 +1,9 @@
 import React from 'react'
-import { Pencil, Trash2, Plus, Cloud, HardDrive, Moon, Sun, Monitor } from 'lucide-react'
+import { Pencil, Trash2, Plus, Moon, Sun, Monitor } from 'lucide-react'
 import { Button } from '../UI/Button'
 import { useProvidersStore } from '../../store/providers'
 import type { ProviderConfig, Theme } from '../../types'
+import { ProviderIcon, getProviderLabel } from '../Providers/ProviderIcon'
 
 interface SettingsPageProps {
   onClose: () => void
@@ -13,15 +14,6 @@ interface SettingsPageProps {
   theme: Theme
   onThemeChange: (t: Theme) => void
 }
-
-const providerLabel = (type: ProviderConfig['type']) =>
-  type === 'aws-s3'
-    ? 'AWS S3'
-    : (type === 'backblaze-b2'
-      ? 'Backblaze B2'
-      : (type === 'wasabi-s3'
-        ? 'Wasabi'
-        : (type === 'minio-s3' ? 'MinIO' : (type === 'digitalocean-spaces' ? 'DigitalOcean Spaces' : 'Cloudflare R2'))))
 
 export function SettingsPage({
   onClose, onEditProvider, onAddProvider, onDeleteProvider, deletingProviderId, theme, onThemeChange
@@ -62,27 +54,15 @@ export function SettingsPage({
                   key={p.id}
                   className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
-                    {p.type === 'aws-s3' ? (
-                      <Cloud className="w-4 h-4 text-[#FF9900]" />
-                    ) : p.type === 'digitalocean-spaces' ? (
-                      <HardDrive className="w-4 h-4 text-[#0080FF]" />
-                    ) : p.type === 'minio-s3' ? (
-                      <HardDrive className="w-4 h-4 text-[#C72E49]" />
-                    ) : p.type === 'wasabi-s3' ? (
-                      <HardDrive className="w-4 h-4 text-[#74B72E]" />
-                    ) : p.type === 'backblaze-b2' ? (
-                      <HardDrive className="w-4 h-4 text-[#E85C33]" />
-                    ) : (
-                      <HardDrive className="w-4 h-4 text-[#F48120]" />
-                    )}
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
+                    <ProviderIcon type={p.type} className="w-full h-full" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate" title={p.name}>
                       {p.name}
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">
-                      {providerLabel(p.type)} - {p.region}
+                      {getProviderLabel(p.type)} - {p.region}
                       {p.endpoint ? ` - ${new URL(p.endpoint).hostname}` : ''}
                       {(p.defaultBucket || p.allowedBuckets?.[0])
                         ? ` - bucket: ${p.defaultBucket || p.allowedBuckets?.[0]}`

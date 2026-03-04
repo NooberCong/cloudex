@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, ChevronDown, Cloud, HardDrive } from 'lucide-react'
+import { CheckCircle, XCircle, ChevronDown } from 'lucide-react'
 import { Dialog } from '../UI/Dialog'
 import { Button } from '../UI/Button'
 import type { ProviderConfig, ProviderType } from '../../types'
 import { useProvidersStore } from '../../store/providers'
 import { useToast } from '../UI/Toast'
+import { ProviderIcon, getProviderLabel } from '../Providers/ProviderIcon'
 
 interface Props {
   open: boolean
@@ -110,24 +111,6 @@ const defaultRegionForType = (type: ProviderType) => {
   if (isMinIOType(type)) return 'us-east-1'
   if (isSpacesType(type)) return 'nyc3'
   return 'us-east-1'
-}
-
-const providerTypeLabel = (type: ProviderType) => {
-  if (type === 'aws-s3') return 'AWS S3'
-  if (type === 'cloudflare-r2') return 'Cloudflare R2'
-  if (type === 'wasabi-s3') return 'Wasabi'
-  if (type === 'minio-s3') return 'MinIO'
-  if (type === 'digitalocean-spaces') return 'DigitalOcean Spaces'
-  return 'Backblaze B2'
-}
-
-const providerTypeIcon = (type: ProviderType) => {
-  if (type === 'aws-s3') return <Cloud className="w-3.5 h-3.5 text-[#FF9900]" />
-  if (type === 'cloudflare-r2') return <HardDrive className="w-3.5 h-3.5 text-[#F48120]" />
-  if (type === 'wasabi-s3') return <HardDrive className="w-3.5 h-3.5 text-[#74B72E]" />
-  if (type === 'minio-s3') return <HardDrive className="w-3.5 h-3.5 text-[#C72E49]" />
-  if (type === 'digitalocean-spaces') return <HardDrive className="w-3.5 h-3.5 text-[#0080FF]" />
-  return <HardDrive className="w-3.5 h-3.5 text-[#E85C33]" />
 }
 
 export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
@@ -256,8 +239,8 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
               className="w-full flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
             >
               <span className="flex items-center gap-2">
-                {providerTypeIcon(form.type)}
-                {providerTypeLabel(form.type)}
+                <ProviderIcon type={form.type} className="w-3.5 h-3.5" />
+                {getProviderLabel(form.type)}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
             </button>
@@ -279,8 +262,8 @@ export function AddProviderDialog({ open, onOpenChange, editing }: Props) {
                         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    {providerTypeIcon(type)}
-                    {providerTypeLabel(type)}
+                    <ProviderIcon type={type} className="w-3.5 h-3.5" />
+                    {getProviderLabel(type)}
                   </button>
                 ))}
               </div>
